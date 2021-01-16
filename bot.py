@@ -1,11 +1,13 @@
 # bot.py
 import os
 import random
-
+import Parse
 import discord
-from dotenv import load_dotenv
+from googletrans import Translator
+#from dotenv import load_dotenv
 
-load_dotenv()
+#load_dotenv()
+translator = Translator(service_urls=['translate.googleapis.com'])
 TOKEN = 'ODAwMDk0MTgwMDQxODE4MTEy.YANHxQ.cGNOFsXvysbB09Q1fasmsmLUoVo'
 GUILD = '694661342145151026'
 
@@ -50,6 +52,20 @@ async def on_message(message):
     if message.content == '!coin':
         response = random.choice(coin)
         await message.channel.send(response)
+    
+    #Translate Feature
+    if message.content[:3] == '!t ':
+        parsedWordArray = parseForTrans(message.content)
+        response = translateFeature(parsedWordArray[0], parsedWordArray[1], parsedWordArray[2])
+        await message.channel.send(response)
+
+def parseForTrans(input):
+    parsedWordArray = input[3:].split(' ', 2)
+    return parsedWordArray
+
+def translateFeature(srcLang, destLang, message):
+    response = translator.translate(message, dest=destLang, src=srcLang)
+    return response.text
 
 
 client.run(TOKEN)

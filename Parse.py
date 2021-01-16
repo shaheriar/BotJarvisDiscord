@@ -1,9 +1,6 @@
-def parseForTans(input):
-    parsedWordArray = input.split(' ', 3)
-    parsedWordArray.remove(".t")
+def parseForTrans(input):
+    parsedWordArray = input[3:].split(' ', 2)
     return parsedWordArray
 
-
-
-test = parseForTans(".t hello my name is Ryan")
+test = parseForTrans("!t en pa water is good")
 print(test)
