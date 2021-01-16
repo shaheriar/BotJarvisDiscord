@@ -4,6 +4,11 @@ import random
 import wikipedia
 import discord
 
+from googletrans import Translator
+translator = Translator(service_urls=['translate.googleapis.com'])
+response = translator.translate('message', dest='hi', src='en')
+print(response.text)
+
 TOKEN = 'ODAwMDk0MTgwMDQxODE4MTEy.YANHxQ.cGNOFsXvysbB09Q1fasmsmLUoVo'
 GUILD = '694661342145151026'
 
@@ -48,7 +53,7 @@ async def on_message(message):
 
     if message.content.startswith('!define'):
         words = message.content
-        print(words)
+        print(words[7:])
         important_words = words[7:]
         await message.channel.send(wiki_define(important_words))
     if message.content.startswith('!summary'):
