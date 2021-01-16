@@ -1,11 +1,14 @@
 # bot.py
 import os
 import random
-
+import wikipedia
 import discord
-from dotenv import load_dotenv
 
-load_dotenv()
+from googletrans import Translator
+translator = Translator(service_urls=['translate.googleapis.com'])
+response = translator.translate('message', dest='hi', src='en')
+print(response.text)
+
 TOKEN = 'ODAwMDk0MTgwMDQxODE4MTEy.YANHxQ.cGNOFsXvysbB09Q1fasmsmLUoVo'
 GUILD = '694661342145151026'
 
@@ -24,32 +27,40 @@ async def on_ready():
 
     members = '\n - '.join([member.name for member in guild.members])
     print(f'Guild Members:\n - {members}')
+    
+
+def wiki_define(arg):
+    try:
+        definition = wikipedia.summary(arg, sentences=1, chars=100, 
+        auto_suggest=False, redirect=True)
+    except wikipedia.exceptions.PageError:
+        definition = 'Error: Page not found'
+        
+    return definition
+
+def wiki_summary(arg):
+    try:
+        definition = wikipedia.summary(arg, sentences=5, chars=1000, 
+        auto_suggest=False, redirect=True)
+    except wikipedia.exceptions.PageError:
+        definition = 'Error: Page not found'
+    return definition
 
 @client.event
 async def on_message(message):
     if message.author == client.user:
         return
 
-    brooklyn_99_quotes = [
-        'I\'m the human form of the 💯 emoji.',
-        'Bingpot!','Cool. Cool cool cool cool cool cool cool, no doubt no doubt no doubt no doubt.',
-    ]
-
-    if message.content == '99!':
-        response = random.choice(brooklyn_99_quotes)
-        await message.channel.send(response)
-    if message.content == '!jason':
-        response = 'jason is on sale for 5 cow no bargain'
-        await message.channel.send(response)
-    if message.content == '!srk':
-        response = 'https://64.media.tumblr.com/eeae49c61424abe31b8639b972079850/tumblr_ntpz7mkHM91uejcvjo4_250.gifv'
-        await message.channel.send(response)
-    if message.content == '!buy':
-        response = 'SOLD! to ' + message.author.name
-        await message.channel.send(response)
-    if message.content == '!coin':
-        response = random.choice(coin)
-        await message.channel.send(response)
+    if message.content.startswith('!define'):
+        words = message.content
+        print(words[7:])
+        important_words = words[7:]
+        await message.channel.send(wiki_define(important_words))
+    if message.content.startswith('!summary'):
+        words = message.content
+        print(words)
+        important_words = words[8:]
+        await message.channel.send(wiki_summary(important_words))
 
 
 client.run(TOKEN)
