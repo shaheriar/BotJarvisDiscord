@@ -1,6 +1,6 @@
 def parseForTans(input):
     parsedWordArray = input.split(' ', 3)
-    parsedWordArray.remove(".t")
+    parsedWordArray.pop(0)
     return parsedWordArray
 
 
