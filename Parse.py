@@ -1,8 +1,9 @@
 def parseForTans(input):
-    parsedWordArray = input.split(' ', 2)
+    parsedWordArray = input.split(' ', 3)
+    parsedWordArray.remove(".t")
     return parsedWordArray
 
 
 
-test = parseForTans("hello my name is Ryan")
+test = parseForTans(".t hello my name is Ryan")
 print(test)
