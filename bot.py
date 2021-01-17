@@ -15,8 +15,8 @@ from googletrans import Translator
 
 #load_dotenv()
 translator = Translator(service_urls=['translate.googleapis.com'])
-TOKEN = 'ODAwMDk0MTgwMDQxODE4MTEy.YANHxQ.cGNOFsXvysbB09Q1fasmsmLUoVo'
-GUILD = '694661342145151026'
+TOKEN = 'token'
+GUILD = 'guildid'
 weatherkey = '3f60abed43493660e7651ea9c58df6fc'
 base_url = "http://api.openweathermap.org/data/2.5/weather?"
 base_news_url =  "https://newsapi.org/v2/top-headlines?language=en&q="
