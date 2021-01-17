@@ -15,7 +15,10 @@ from googletrans import Translator
 #load_dotenv()
 translator = Translator(service_urls=['translate.googleapis.com'])
 TOKEN = 'ODAwMDk0MTgwMDQxODE4MTEy.YANHxQ.cGNOFsXvysbB09Q1fasmsmLUoVo'
+#TOKEN = 'ODAwMTM0MTMwMTYyNzI5MDIw.YANs-g.cbSBiLAtAF02RKm4bMjsVRCiXIw'
 GUILD = '694661342145151026'
+weatherkey = '3f60abed43493660e7651ea9c58df6fc'
+base_url = "http://api.openweathermap.org/data/2.5/weather?"
 
 client = discord.Client()
 
@@ -186,12 +189,49 @@ async def on_message(message):
         print(words[5:])
         await message.channel.send(words[5:])
 
-    #################### H A N G - M A N ######################
+    #################### W E A T H E R ######################
 
-    if message.content.startswith('.hangman'):
+    if message.content.startswith('!weather'):
         words = message.content
-        await play()
-        await message.channel.send('playing hangman')
+        print(words[8:])
+        important_words = words[8:]
+        city_name = important_words
+        complete_url = base_url + "appid=" + weatherkey + "&units=imperial" + "&q=" + city_name
+        response = requests.get(complete_url)
+        x = response.json()
+        print('PRINTING X')
+        print(x["cod"])
+        if x["cod"] != "404":
+            # store the value of "main" 
+            # key in variable y 
+            y = x["main"] 
+          
+            # store the value corresponding 
+            # to the "temp" key of y 
+            current_temperature = y["temp"] 
+          
+            # store the value corresponding 
+            # to the "pressure" key of y 
+            current_pressure = y["pressure"] 
+          
+            # store the value corresponding 
+            # to the "humidity" key of y 
+            current_humidity = y["humidity"] 
+          
+            # store the value of "weather" 
+            # key in variable z 
+            z = x["weather"]
+            f = current_temperature
+            f = round(f,0)
+            city_name = city_name.capitalize()
+          
+            # store the value corresponding  
+            # to the "description" key at  
+            # the 0th index of z 
+            weather_description = '**Weather for ' + city_name + ':**' + '\n"' + z[0]["main"] + '" with a temperature of ' + str(f) + '°F and humidity ' + str(current_humidity) + '%'
+            await message.channel.send(weather_description)
+        else:
+            await message.channel.send('City not found')
 
     ###########################################################
 
