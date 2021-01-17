@@ -34,7 +34,8 @@ async def on_ready():
 
 def wiki_define(arg):
     try:
-        definition = wikipedia.summary(arg, sentences=1, chars=100, 
+        img = random.choice(wikipedia.WikipediaPage(title=arg).images)
+        definition = img+'\n'+wikipedia.summary(arg, sentences=1, chars=100, 
         auto_suggest=False, redirect=True)
     except wikipedia.exceptions.PageError:
         err = wiki_search(arg)
@@ -44,7 +45,8 @@ def wiki_define(arg):
 
 def wiki_summary(arg):
     try:
-        definition = wikipedia.summary(arg, sentences=5, chars=1000, 
+        img = random.choice(wikipedia.WikipediaPage(title=arg).images)
+        definition = img+'\n'+wikipedia.summary(arg, sentences=5, chars=1000, 
         auto_suggest=False, redirect=True)
     except wikipedia.exceptions.PageError:
         err = wiki_search(arg)
@@ -94,16 +96,6 @@ async def on_message(message):
         await message.channel.send(wiki_search(important_words))
 
     #################### G R E E T I N G S ######################
-        
-    if message.content.startswith('thanks jarvis'):
-        words = message.content
-        print(words)
-        await message.channel.send('You\'re welcome')
-        
-    if message.content.startswith('!echo'):
-        words = message.content
-        print(words[5:])
-        await message.channel.send(words[5:])
 
     if message.content.startswith('hey jarvis'):
         words = message.content
@@ -112,6 +104,12 @@ async def on_message(message):
         await message.channel.send(random.choice(greet)+mention)
         
     if message.content.startswith('hi jarvis'):
+        words = message.content
+        mention = message.author.mention
+        print(words)
+        await message.channel.send(random.choice(greet)+mention)
+
+    if message.content.startswith('hello jarvis'):
         words = message.content
         mention = message.author.mention
         print(words)
@@ -130,6 +128,34 @@ async def on_message(message):
         await message.channel.send(random.choice(greet)+mention)
 
     #################### M I S C E L L A N E O U S ######################
+
+    if message.content.startswith('thanks jarvis'):
+        words = message.content
+        print(words)
+        await message.channel.send('You\'re welcome')
+
+    if message.content.startswith('jarvis i love you'):
+        words = message.content
+        print(words)
+        await message.channel.send('I love you, too')
+        
+    if message.content.startswith('thank you jarvis'):
+        words = message.content
+        print(words)
+        await message.channel.send('You\'re welcome')
+
+    if message.content.startswith('jarvis tell me a joke'):
+        words = message.content
+        print(words[7:])
+        important_words = words[7:]
+        f = r"https://official-joke-api.appspot.com/random_joke"
+        a = jokes(f)
+        await message.channel.send(a["setup"]+'\n'+'||'+a["punchline"]+'||')
+        
+    if message.content.startswith('!echo'):
+        words = message.content
+        print(words[5:])
+        await message.channel.send(words[5:])
 
     if message.content.startswith('fuck you jarvis'):
         words = message.content
