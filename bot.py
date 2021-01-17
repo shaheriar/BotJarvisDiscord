@@ -20,7 +20,7 @@ TOKEN = 'ODAwMTM0MTMwMTYyNzI5MDIw.YANs-g.cbSBiLAtAF02RKm4bMjsVRCiXIw'
 GUILD = '694661342145151026'
 weatherkey = '3f60abed43493660e7651ea9c58df6fc'
 base_url = "http://api.openweathermap.org/data/2.5/weather?"
-base_news_url =  "https://newsapi.org/v2/top-headlines?"
+base_news_url =  "https://newsapi.org/v2/top-headlines?language=en&q="
 newsapi = NewsApiClient(api_key='47c3bf3394664eb48d0a803451f2d19c')
 
 client = discord.Client()
@@ -207,15 +207,18 @@ async def on_message(message):
         await message.channel.send(words[5:])
 
     #################### N E W S ######################
-    
 
     if message.content.startswith('!news'):
         words = message.content
         print(words[6:])
         important_words = words[6:]
         typeOfNews = important_words
-        complete_url = base_news_url + typeOfNews + "&apiKey=47c3bf3394664eb48d0a803451f2d19c"
-        response = requests.get(complete_url)
+        try:
+            complete_url = base_news_url + typeOfNews + "&apiKey=47c3bf3394664eb48d0a803451f2d19c"
+            response = requests.get(complete_url)
+        except IndexError:
+            complete_url = "https://newsapi.org/v2/top-headlines?country=us&apiKey=f7b4326c68b24aee96970d83bb5102f3"
+            response = requests.get(complete_url)
         x = response.json()
         def newFormat(num):
             src = x["articles"][num]["source"]["name"]
@@ -226,7 +229,11 @@ async def on_message(message):
             content = x["articles"][num]["content"]
             return src + ":\n" + title + ":\n" + des + " " + url
         if x["status"] != 'error':
-            contents = [newFormat(0), newFormat(1), newFormat(2), newFormat(3)]
+            if x["totalResults"] >= 4:
+                contents = [newFormat(0), newFormat(1), newFormat(2), newFormat(3)]
+            else:
+                await message.channel.send("Cannot find article")
+                return
             async def newspages(ctx):
                 pages = 4
                 cur_page = 1
@@ -263,10 +270,11 @@ async def on_message(message):
                     except asyncio.TimeoutError:
                         await message.delete()
                         break
+                        
                         # ending the loop if user doesn't react after x seconds
             await newspages(message)
         else:
-            await message.channel.send('news not found')
+            await message.channel.send('News not found')
 
     #################### W E A T H E R ######################
 
@@ -326,7 +334,8 @@ async def on_message(message):
         line7 = '**!weather {city}** : Get weather info for any city\n'
         line8 = '**!t {source} {destination} {text}** : Translate anything from source language to destination language\n'
         line9 = '**!langs** : Get a list of supported languages to translate\n'
-        helptext = line1+line2+line3+line4+line5+line6+line7+line8+line9
+        line10 = '**!news {topic}** : Get a list of news you\'re searching for\n'
+        helptext = line1+line2+line3+line4+line5+line6+line7+line8+line9+line10
         await message.channel.send(helptext)
 
     #################### T R A N S L A T E ######################
