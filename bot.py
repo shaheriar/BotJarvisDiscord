@@ -15,8 +15,7 @@ from googletrans import Translator
 
 #load_dotenv()
 translator = Translator(service_urls=['translate.googleapis.com'])
-#TOKEN = 'ODAwMDk0MTgwMDQxODE4MTEy.YANHxQ.cGNOFsXvysbB09Q1fasmsmLUoVo'
-TOKEN = 'ODAwMTM0MTMwMTYyNzI5MDIw.YANs-g.cbSBiLAtAF02RKm4bMjsVRCiXIw'
+TOKEN = 'ODAwMDk0MTgwMDQxODE4MTEy.YANHxQ.cGNOFsXvysbB09Q1fasmsmLUoVo'
 GUILD = '694661342145151026'
 weatherkey = '3f60abed43493660e7651ea9c58df6fc'
 base_url = "http://api.openweathermap.org/data/2.5/weather?"
@@ -310,12 +309,12 @@ async def on_message(message):
             z = x["weather"]
             f = current_temperature
             f = round(f,0)
-            city_name = city_name.capitalize()
+            #city_name = city_name.capitalize()
           
             # store the value corresponding  
             # to the "description" key at  
             # the 0th index of z 
-            weather_description = '**Weather for ' + city_name + ':**' + '\n"' + z[0]["main"] + '" with a temperature of ' + str(f) + '°F and humidity ' + str(current_humidity) + '%'
+            weather_description = '**Weather for' + city_name.title() + ':**' + '\n"' + z[0]["main"] + '" with a temperature of ' + str(f) + '°F and humidity ' + str(current_humidity) + '%'
             await message.channel.send(weather_description)
         else:
             await message.channel.send('City not found')
