@@ -4,6 +4,8 @@ import os
 import random
 import Parse
 import discord
+import requests
+import json
 import wikipedia
 from googletrans import Translator
 #from dotenv import load_dotenv
@@ -14,6 +16,12 @@ TOKEN = 'ODAwMDk0MTgwMDQxODE4MTEy.YANHxQ.cGNOFsXvysbB09Q1fasmsmLUoVo'
 GUILD = '694661342145151026'
 
 client = discord.Client()
+
+def jokes(f):
+    
+    data = requests.get(f)
+    tt = json.loads(data.text)
+    return tt
 
 @client.event
 async def on_ready():
