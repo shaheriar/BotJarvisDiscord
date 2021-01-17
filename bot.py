@@ -2,11 +2,12 @@
 
 import os
 import random
-import Parse
+from Parse import parseForTrans
 import discord
 import requests
 import json
 import wikipedia
+from HangMan import play
 from googletrans import Translator
 #from dotenv import load_dotenv
 
@@ -36,6 +37,7 @@ async def on_ready():
 
     members = '\n - '.join([member.name for member in guild.members])
     print(f'Guild Members:\n - {members}')
+    
     
 
     #################### W I K I P E D I A ######################
@@ -171,9 +173,6 @@ async def on_message(message):
         print(words)
         await message.channel.send('That\'s not very nice.')
 
-def parseForTrans(input):
-    parsedWordArray = input[3:].split(' ', 2)
-    return parsedWordArray
 
 def translateFeature(srcLang, destLang, message):
     response = translator.translate(message, dest=destLang, src=srcLang)
