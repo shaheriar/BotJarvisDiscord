@@ -1,4 +1,4 @@
-# BotJarvisDiscord
+# Jarvis Discord Assistant
 Discord Bot project for Rose Hack 2021.
 
 ## Project members
@@ -8,6 +8,9 @@ Discord Bot project for Rose Hack 2021.
 [Ryan Giron](https://github.com/rgiron1)
 
 [Simraj Singh](https://github.com/simrajsingh)
+
+## Usage
+![help](https://github.com/shaheriar/BotJarvisDiscord/blob/main/unknown.png)
 
 ## Inspiration
 The inspiration came from Iron Man and his AI Jarvis. We wanted to create an assistant that felt like his AI and could be genuinely useful.
