@@ -217,18 +217,17 @@ async def on_message(message):
         complete_url = base_news_url + typeOfNews + "&apiKey=47c3bf3394664eb48d0a803451f2d19c"
         response = requests.get(complete_url)
         x = response.json()
-        async def pages(ctx):
-            def newFormat(num):
-                src = x["articles"][num]["source"]["name"]
-                author = x["articles"][num]["author"]
-                title = x["articles"][num]["title"]
-                des = x["articles"][num]["description"]
-                url = x["articles"][num]["url"]
-                content = x["articles"][num]["content"]
-                return src + ":\n" + title + ":\n" + des + " " + url 
-            print(x["status"])
-            if x["status"] != 'error':
-                contents = [newFormat(0), newFormat(1), newFormat(2), newFormat(3)]
+        def newFormat(num):
+            src = x["articles"][num]["source"]["name"]
+            author = x["articles"][num]["author"]
+            title = x["articles"][num]["title"]
+            des = x["articles"][num]["description"]
+            url = x["articles"][num]["url"]
+            content = x["articles"][num]["content"]
+            return src + ":\n" + title + ":\n" + des + " " + url
+        if x["status"] != 'error':
+            contents = [newFormat(0), newFormat(1), newFormat(2), newFormat(3)]
+            async def newspages(ctx):
                 pages = 4
                 cur_page = 1
                 message = await ctx.channel.send(f"__**Page {cur_page}/{pages}**__:\n\n{contents[cur_page-1]}")
@@ -264,9 +263,10 @@ async def on_message(message):
                     except asyncio.TimeoutError:
                         await message.delete()
                         break
-                await message.channel.send(news_message)
-            else:
-                await message.channel.send('news not found')
+                        # ending the loop if user doesn't react after x seconds
+            await newspages(message)
+        else:
+            await message.channel.send('news not found')
 
     #################### W E A T H E R ######################
 
