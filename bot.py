@@ -14,8 +14,8 @@ from googletrans import Translator
 
 #load_dotenv()
 translator = Translator(service_urls=['translate.googleapis.com'])
-TOKEN = 'ODAwMDk0MTgwMDQxODE4MTEy.YANHxQ.cGNOFsXvysbB09Q1fasmsmLUoVo'
-#TOKEN = 'ODAwMTM0MTMwMTYyNzI5MDIw.YANs-g.cbSBiLAtAF02RKm4bMjsVRCiXIw'
+#TOKEN = 'ODAwMDk0MTgwMDQxODE4MTEy.YANHxQ.cGNOFsXvysbB09Q1fasmsmLUoVo'
+TOKEN = 'ODAwMTM0MTMwMTYyNzI5MDIw.YANs-g.cbSBiLAtAF02RKm4bMjsVRCiXIw'
 GUILD = '694661342145151026'
 weatherkey = '3f60abed43493660e7651ea9c58df6fc'
 base_url = "http://api.openweathermap.org/data/2.5/weather?"
@@ -47,22 +47,36 @@ async def on_ready():
 def wiki_define(arg):
     try:
         img = random.choice(wikipedia.WikipediaPage(title=arg).images)
+        if img[-3:] == 'svg':
+            while img[-3:] == 'svg':
+               img = random.choice(wikipedia.WikipediaPage(title=arg).images)
+               
         definition = img+'\n'+wikipedia.summary(arg, sentences=1, chars=100, 
         auto_suggest=False, redirect=True)
     except wikipedia.exceptions.PageError:
         err = wiki_search(arg)
         definition = '**Error: Page not found**\n__Did you mean:__\n'+err
+    except wikipedia.exceptions.DisambiguationError:
+        err = wiki_search(arg)
+        definition = '__Did you mean:__\n'+err
         
     return definition
 
 def wiki_summary(arg):
     try:
         img = random.choice(wikipedia.WikipediaPage(title=arg).images)
+        if img[-3:] == 'svg':
+            while img[-3:] == 'svg':
+               img = random.choice(wikipedia.WikipediaPage(title=arg).images)
+               
         definition = img+'\n'+wikipedia.summary(arg, sentences=5, chars=1000, 
         auto_suggest=False, redirect=True)
     except wikipedia.exceptions.PageError:
         err = wiki_search(arg)
         definition = '**Error: Page not found**\n__Did you mean:__\n'+err
+    except wikipedia.exceptions.DisambiguationError:
+        err = wiki_search(arg)
+        definition = '__Did you mean:__\n'+err
     return definition
 
 def wiki_search(arg):
