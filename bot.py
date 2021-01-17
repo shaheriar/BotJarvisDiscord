@@ -247,8 +247,24 @@ async def on_message(message):
         else:
             await message.channel.send('City not found')
 
-    ###########################################################
+    #################### H E L P ######################
 
+    if message.content.startswith('!help'):
+        words = message.content
+        print(words)
+        line1 = '**HELP PAGE\n'
+        line2 = '__LIST OF COMMANDS__**\n'
+        line3 = '**!help** : Opens the help page\n'
+        line4 = '**!define {word}** : Get a one sentence definition of anything\n'
+        line5 = '**!summary {word}** : Get a more in depth definition of anything\n'
+        line6 = '**!search {word}** : Search for keywords\n'
+        line7 = '**!weather {city}** : Get weather info for any city\n'
+        line8 = '**!t {source} {destination} {text}** : Translate anything from source language to destination language\n'
+        line9 = '**!langs** : Get a list of supported languages to translate\n'
+        helptext = line1+line2+line3+line4+line5+line6+line7+line8+line9
+        await message.channel.send(helptext)
+
+    #################### T R A N S L A T E ######################
 
 def translateFeature(srcLang, destLang, message):
     response = translator.translate(message, dest=destLang, src=srcLang)
