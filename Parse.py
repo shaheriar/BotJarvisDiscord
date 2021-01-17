@@ -1,9 +1,3 @@
-def parseForTans(input):
-    parsedWordArray = input.split(' ', 3)
-    parsedWordArray.pop(0)
+def parseForTrans(input):
+    parsedWordArray = input[3:].split(' ', 2)
     return parsedWordArray
-
-
-
-test = parseForTans(".t hello my name is Ryan")
-print(test)
