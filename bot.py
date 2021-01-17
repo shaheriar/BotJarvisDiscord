@@ -8,6 +8,7 @@ import requests
 import json
 import wikipedia
 import asyncio
+from newsapi import NewsApiClient
 from HangMan import play
 from googletrans import Translator
 #from dotenv import load_dotenv
@@ -19,6 +20,8 @@ TOKEN = 'ODAwMTM0MTMwMTYyNzI5MDIw.YANs-g.cbSBiLAtAF02RKm4bMjsVRCiXIw'
 GUILD = '694661342145151026'
 weatherkey = '3f60abed43493660e7651ea9c58df6fc'
 base_url = "http://api.openweathermap.org/data/2.5/weather?"
+base_news_url =  "https://newsapi.org/v2/top-headlines?"
+newsapi = NewsApiClient(api_key='47c3bf3394664eb48d0a803451f2d19c')
 
 client = discord.Client()
 
@@ -202,6 +205,68 @@ async def on_message(message):
         words = message.content
         print(words[5:])
         await message.channel.send(words[5:])
+
+    #################### N E W S ######################
+    
+
+    if message.content.startswith('!news'):
+        words = message.content
+        print(words[6:])
+        important_words = words[6:]
+        typeOfNews = important_words
+        complete_url = base_news_url + typeOfNews + "&apiKey=47c3bf3394664eb48d0a803451f2d19c"
+        response = requests.get(complete_url)
+        x = response.json()
+        async def pages(ctx):
+            def newFormat(num):
+                src = x["articles"][num]["source"]["name"]
+                author = x["articles"][num]["author"]
+                title = x["articles"][num]["title"]
+                des = x["articles"][num]["description"]
+                url = x["articles"][num]["url"]
+                content = x["articles"][num]["content"]
+                return src + ":\n" + title + ":\n" + des + " " + url 
+            print(x["status"])
+            if x["status"] != 'error':
+                contents = [newFormat(0), newFormat(1), newFormat(2), newFormat(3)]
+                pages = 4
+                cur_page = 1
+                message = await ctx.channel.send(f"__**Page {cur_page}/{pages}**__:\n\n{contents[cur_page-1]}")
+                # getting the message object for editing and reacting
+
+                await message.add_reaction("◀️")
+                await message.add_reaction("▶️")
+
+                def check(reaction, user):
+                    return user == ctx.author and str(reaction.emoji) in ["◀️", "▶️"]
+                    # This makes sure nobody except the command sender can interact with the "menu"
+
+                while True:
+                    try:
+                        reaction, user = await client.wait_for("reaction_add", timeout=60, check=check)
+                        # waiting for a reaction to be added - times out after x seconds, 60 in this
+                        # example
+
+                        if str(reaction.emoji) == "▶️" and cur_page != pages:
+                            cur_page += 1
+                            await message.edit(content=f"__**Page {cur_page}/{pages}**__:\n\n{contents[cur_page-1]}")
+                            await message.remove_reaction(reaction, user)
+
+                        elif str(reaction.emoji) == "◀️" and cur_page > 1:
+                            cur_page -= 1
+                            await message.edit(content=f"__**Page {cur_page}/{pages}**__:\n\n{contents[cur_page-1]}")
+                            await message.remove_reaction(reaction, user)
+
+                        else:
+                            await message.remove_reaction(reaction, user)
+                            # removes reactions if the user tries to go forward on the last page or
+                            # backwards on the first page
+                    except asyncio.TimeoutError:
+                        await message.delete()
+                        break
+                await message.channel.send(news_message)
+            else:
+                await message.channel.send('news not found')
 
     #################### W E A T H E R ######################
 
