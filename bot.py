@@ -9,7 +9,6 @@ import json
 import wikipedia
 import asyncio
 from newsapi import NewsApiClient
-from HangMan import play
 from googletrans import Translator
 #from dotenv import load_dotenv
 
