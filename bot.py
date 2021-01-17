@@ -157,10 +157,23 @@ async def on_message(message):
 
     #################### M I S C E L L A N E O U S ######################
 
+    coin = ['Heads!', 'Tails!']
+    ball = ['Yes', 'Try again', 'No', 'I don\'t think so', 'Highly likely']
+    
     if message.content.startswith('thanks jarvis'):
         words = message.content
         print(words)
         await message.channel.send('You\'re welcome')
+
+    if message.content.startswith('!coin'):
+        words = message.content
+        print(words)
+        await message.channel.send(random.choice(coin))
+
+    if message.content.startswith('!8ball'):
+        words = message.content
+        print(words)
+        await message.channel.send(random.choice(ball))
 
     if message.content.startswith('jarvis i love you'):
         words = message.content
@@ -334,7 +347,9 @@ async def on_message(message):
         line8 = '**!t {source} {destination} {text}** : Translate anything from source language to destination language\n'
         line9 = '**!langs** : Get a list of supported languages to translate\n'
         line10 = '**!news {topic}** : Get a list of news you\'re searching for\n'
-        helptext = line1+line2+line3+line4+line5+line6+line7+line8+line9+line10
+        line11 = '**!coin** : Flip a coin!\n'
+        line12 = '**!8ball {text}** : Let the magic 8-Ball decide your fate\n'
+        helptext = line1+line2+line3+line4+line5+line6+line7+line8+line9+line10+line11+line12
         await message.channel.send(helptext)
 
     #################### T R A N S L A T E ######################
