@@ -7,6 +7,7 @@ import discord
 import requests
 import json
 import wikipedia
+import asyncio
 from HangMan import play
 from googletrans import Translator
 #from dotenv import load_dotenv
@@ -37,8 +38,6 @@ async def on_ready():
 
     members = '\n - '.join([member.name for member in guild.members])
     print(f'Guild Members:\n - {members}')
-    
-    
 
     #################### W I K I P E D I A ######################
 
@@ -148,6 +147,26 @@ async def on_message(message):
         words = message.content
         print(words)
         await message.channel.send('I love you, too')
+
+    if message.content.startswith('how are you jarvis'):
+        words = message.content
+        print(words)
+        await message.channel.send('I\'m doing quite well.')
+
+    if message.content.startswith('how are you doing jarvis'):
+        words = message.content
+        print(words)
+        await message.channel.send('I\'m doing quite well.')
+
+    if message.content.startswith('shut up jarvis'):
+        words = message.content
+        print(words)
+        await message.channel.send(':(')
+
+    if message.content.startswith('jarvis shut up'):
+        words = message.content
+        print(words)
+        await message.channel.send(':(')
         
     if message.content.startswith('thank you jarvis'):
         words = message.content
@@ -167,11 +186,14 @@ async def on_message(message):
         print(words[5:])
         await message.channel.send(words[5:])
 
-    if message.content.startswith('fuck you jarvis'):
+    #################### H A N G - M A N ######################
+
+    if message.content.startswith('.hangman'):
         words = message.content
-        mention = message.author.mention
-        print(words)
-        await message.channel.send('That\'s not very nice.')
+        await play()
+        await message.channel.send('playing hangman')
+
+    ###########################################################
 
 
 def translateFeature(srcLang, destLang, message):

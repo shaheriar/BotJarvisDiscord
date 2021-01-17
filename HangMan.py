@@ -146,5 +146,3 @@ def play():
             start = False
         elif choice.lower() == 'n':
             break
-    
-#play()
