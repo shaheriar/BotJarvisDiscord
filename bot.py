@@ -33,13 +33,9 @@ def jokes(f):
 @client.event
 async def on_ready():
     for guild in client.guilds:
+        print(f'{client.user} is connected to the following guild:\n{guild.name}(id: {guild.id})\n')
         if guild.name == GUILD:
             break
-
-    print(
-        f'{client.user} is connected to the following guild:\n'
-        f'{guild.name}(id: {guild.id})'
-    )
 
     members = '\n - '.join([member.name for member in guild.members])
     print(f'Guild Members:\n - {members}')
@@ -94,7 +90,10 @@ greet = ['Hi ', 'Hello ', 'What\'s up, ', 'Greetings, ', 'Sup ']
 async def on_message(message):
     if message.author == client.user:
         return
-      
+
+    if message.content.startswith('!dice'):
+        await message.channel.send(random.randint(1, 6))
+        
     #Display Languages
     if message.content.startswith('!langs'):
         await pages(message)
@@ -104,23 +103,20 @@ async def on_message(message):
         parsedWordArray = parseForTrans(message.content)
         response = translateFeature(parsedWordArray[0], parsedWordArray[1], parsedWordArray[2])
         await message.channel.send(response)
-        time.sleep(2)
+        time.sleep(1)
         
     if message.content.startswith('!define'):
         words = message.content
-        print(words[7:])
         important_words = words[7:]
         await message.channel.send(wiki_define(important_words))
         
     if message.content.startswith('!summary'):
         words = message.content
-        print(words[8:])
         important_words = words[8:]
         await message.channel.send(wiki_summary(important_words))
         
     if message.content.startswith('!search'):
         words = message.content
-        print(words[7:])
         important_words = words[7:]
         await message.channel.send(wiki_search(important_words))
 
@@ -129,86 +125,71 @@ async def on_message(message):
     if message.content.startswith('hey jarvis'):
         words = message.content
         mention = message.author.mention
-        print(words)
         await message.channel.send(random.choice(greet)+mention)
         
     if message.content.startswith('hi jarvis'):
         words = message.content
         mention = message.author.mention
-        print(words)
         await message.channel.send(random.choice(greet)+mention)
 
     if message.content.startswith('hello jarvis'):
         words = message.content
         mention = message.author.mention
-        print(words)
         await message.channel.send(random.choice(greet)+mention)
 
     if message.content.startswith('sup jarvis'):
         words = message.content
         mention = message.author.mention
-        print(words)
         await message.channel.send(random.choice(greet)+mention)
 
     if message.content.startswith('yo jarvis'):
         words = message.content
         mention = message.author.mention
-        print(words)
         await message.channel.send(random.choice(greet)+mention)
 
     #################### M I S C E L L A N E O U S ######################
 
     coin = ['Heads!', 'Tails!']
-    ball = ['Yes', 'Try again', 'No', 'I don\'t think so', 'Highly likely']
+    ball =['As I see it, yes.', 'Ask again later.','Better not tell you now.','Cannot predict now.','Concentrate and ask again.','Don’t count on it.','It is certain.','It is decidedly so.','Most likely.','My reply is no.','My sources say no.','Outlook not so good.','Outlook good.','Reply hazy, try again.','Signs point to yes.','Very doubtful.','Without a doubt.','Yes.','Yes – definitely.','You may rely on it.']
     
     if message.content.startswith('thanks jarvis'):
         words = message.content
-        print(words)
         await message.channel.send('You\'re welcome')
 
     if message.content.startswith('!coin'):
         words = message.content
-        print(words)
         await message.channel.send(random.choice(coin))
 
     if message.content.startswith('!8ball'):
         words = message.content
-        print(words)
         await message.channel.send(random.choice(ball))
 
     if message.content.startswith('jarvis i love you'):
         words = message.content
-        print(words)
         await message.channel.send('I love you, too')
 
     if message.content.startswith('how are you jarvis'):
         words = message.content
-        print(words)
         await message.channel.send('I\'m doing quite well.')
 
     if message.content.startswith('how are you doing jarvis'):
         words = message.content
-        print(words)
         await message.channel.send('I\'m doing quite well.')
 
     if message.content.startswith('shut up jarvis'):
         words = message.content
-        print(words)
         await message.channel.send(':(')
 
     if message.content.startswith('jarvis shut up'):
         words = message.content
-        print(words)
         await message.channel.send(':(')
         
     if message.content.startswith('thank you jarvis'):
         words = message.content
-        print(words)
         await message.channel.send('You\'re welcome')
 
     if message.content.startswith('jarvis tell me a joke'):
         words = message.content
-        print(words[7:])
         important_words = words[7:]
         f = r"https://official-joke-api.appspot.com/random_joke"
         a = jokes(f)
@@ -216,14 +197,12 @@ async def on_message(message):
         
     if message.content.startswith('!echo'):
         words = message.content
-        print(words[5:])
         await message.channel.send(words[5:])
 
     #################### N E W S ######################
 
     if message.content.startswith('!news'):
         words = message.content
-        print(words[6:])
         important_words = words[6:]
         typeOfNews = important_words
         try:
@@ -293,14 +272,11 @@ async def on_message(message):
 
     if message.content.startswith('!weather'):
         words = message.content
-        print(words[8:])
         important_words = words[8:]
         city_name = important_words
         complete_url = base_url + "appid=" + weatherkey + "&units=imperial" + "&q=" + city_name
         response = requests.get(complete_url)
         x = response.json()
-        print('PRINTING X')
-        print(x["cod"])
         if x["cod"] != "404":
             # store the value of "main" 
             # key in variable y 
@@ -337,7 +313,6 @@ async def on_message(message):
 
     if message.content.startswith('!help'):
         words = message.content
-        print(words)
         line1 = '**HELP PAGE\n'
         line2 = '__LIST OF COMMANDS__**\n'
         line3 = '**!help** : Opens the help page\n'
@@ -350,7 +325,8 @@ async def on_message(message):
         line10 = '**!news {topic}** : Get a list of news you\'re searching for\n'
         line11 = '**!coin** : Flip a coin!\n'
         line12 = '**!8ball {text}** : Let the magic 8-Ball decide your fate\n'
-        helptext = line1+line2+line3+line4+line5+line6+line7+line8+line9+line10+line11+line12
+        line13 = '**!dice** : Roll a dice and get a random number from 1 to 6\n'
+        helptext = line1+line2+line3+line4+line5+line6+line7+line8+line9+line10+line11+line12+line13
         await message.channel.send(helptext)
 
     #################### T R A N S L A T E ######################
