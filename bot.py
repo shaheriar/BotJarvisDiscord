@@ -6,16 +6,17 @@ from Parse import parseForTrans
 import discord
 import requests
 import json
+import time
 import wikipedia
 import asyncio
 from newsapi import NewsApiClient
-from googletrans import Translator
+from translate import translator
 #from dotenv import load_dotenv
 
 #load_dotenv()
-translator = Translator(service_urls=['translate.googleapis.com'])
-TOKEN = 'token'
-GUILD = 'guildid'
+#translator = translator(service_urls=['translate.googleapis.com'])
+TOKEN = '<token>'
+GUILD = '<guild>'
 weatherkey = '3f60abed43493660e7651ea9c58df6fc'
 base_url = "http://api.openweathermap.org/data/2.5/weather?"
 base_news_url =  "https://newsapi.org/v2/top-headlines?language=en&q="
@@ -103,6 +104,7 @@ async def on_message(message):
         parsedWordArray = parseForTrans(message.content)
         response = translateFeature(parsedWordArray[0], parsedWordArray[1], parsedWordArray[2])
         await message.channel.send(response)
+        time.sleep(2)
         
     if message.content.startswith('!define'):
         words = message.content
@@ -354,8 +356,10 @@ async def on_message(message):
     #################### T R A N S L A T E ######################
 
 def translateFeature(srcLang, destLang, message):
-    response = translator.translate(message, dest=destLang, src=srcLang)
-    return response.text
+    response = translator(srcLang, destLang, message)
+    print('PRINTING RESPONSE')
+    print(response[0][0][0])
+    return response[0][0][0]
 
 #scroll menu
 async def pages(ctx):
