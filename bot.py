@@ -32,6 +32,8 @@ def jokes(f):
 
 @client.event
 async def on_ready():
+    game = discord.Game("!help")
+    await client.change_presence(status=discord.Status.active, activity=game)
     for guild in client.guilds:
         print(f'{client.user} is connected to the following guild:\n{guild.name}(id: {guild.id})\n')
         if guild.name == GUILD:
