@@ -33,7 +33,7 @@ def jokes(f):
 @client.event
 async def on_ready():
     game = discord.Game("!help")
-    await client.change_presence(status=discord.Status.active, activity=game)
+    await client.change_presence(activity=game)
     for guild in client.guilds:
         print(f'{client.user} is connected to the following guild:\n{guild.name}(id: {guild.id})\n')
         if guild.name == GUILD:
@@ -46,44 +46,51 @@ async def on_ready():
 
 def wiki_define(arg):
     try:
-        img = random.choice(wikipedia.WikipediaPage(title=arg).images)
-        if img[-3:] == 'svg':
-            while img[-3:] == 'svg':
-               img = random.choice(wikipedia.WikipediaPage(title=arg).images)
-               
-        definition = img+'\n'+wikipedia.summary(arg, sentences=1, chars=100, 
-        auto_suggest=False, redirect=True)
+        url = r'https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&titles='+wikipedia.search(arg, results=1, suggestion=False)[0]+'&pithumbsize=500&format=json'
+        req = requests.get(url)
+        getj = json.loads(req.text)
+        try:
+            img = list(getj["query"]["pages"].values())[0]["thumbnail"]["source"]
+        except KeyError:
+            img = ' '
+        definition = wikipedia.summary(arg, sentences=1, chars=100, 
+        auto_suggest=False, redirect=True)+'\n'+img
     except wikipedia.exceptions.PageError:
-        err = wiki_search(arg)
+        err = '`'+wiki_search(arg)+'`'
         definition = '**Error: Page not found**\n__Did you mean:__\n'+err
     except wikipedia.exceptions.DisambiguationError:
-        err = wiki_search(arg)
+        err = '`'+wiki_search(arg)+'`'
         definition = '__Did you mean:__\n'+err
-        
+    except wikipedia.exceptions.WikipediaException:
+        return
     return definition
 
 def wiki_summary(arg):
     try:
-        img = random.choice(wikipedia.WikipediaPage(title=arg).images)
-        if img[-3:] == 'svg':
-            while img[-3:] == 'svg':
-               img = random.choice(wikipedia.WikipediaPage(title=arg).images)
-               
-        definition = img+'\n'+wikipedia.summary(arg, sentences=5, chars=1000, 
-        auto_suggest=False, redirect=True)
+        url = r'https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&titles='+wikipedia.search(arg, results=1, suggestion=False)[0]+'&pithumbsize=500&format=json'
+        req = requests.get(url)
+        getj = json.loads(req.text)
+        try:
+            img = list(getj["query"]["pages"].values())[0]["thumbnail"]["source"]
+        except KeyError:
+            img = ' '
+        definition = wikipedia.summary(arg, sentences=5, chars=1000, 
+        auto_suggest=False, redirect=True)+'\n'+img
     except wikipedia.exceptions.PageError:
-        err = wiki_search(arg)
+        err = '`'+wiki_search(arg)+'`'
         definition = '**Error: Page not found**\n__Did you mean:__\n'+err
     except wikipedia.exceptions.DisambiguationError:
-        err = wiki_search(arg)
+        err = '`'+wiki_search(arg)+'`'
         definition = '__Did you mean:__\n'+err
+    except wikipedia.exceptions.WikipediaException:
+        return
     return definition
 
 def wiki_search(arg):
     print(wikipedia.search(arg, results=10, suggestion=False))
     results = wikipedia.search(arg, results=10, suggestion=False)
     rslt = '\n'.join(results)
-    return '`'+rslt+'`'
+    return rslt
 
 greet = ['Hi ', 'Hello ', 'What\'s up, ', 'Greetings, ', 'Sup ']
 
@@ -104,23 +111,35 @@ async def on_message(message):
     if message.content[:3] == '!t ':
         parsedWordArray = parseForTrans(message.content)
         response = translateFeature(parsedWordArray[0], parsedWordArray[1], parsedWordArray[2])
-        await message.channel.send(response)
-        time.sleep(1)
+        try:
+            await message.channel.send(response)
+            time.sleep(1)
+        except discord.errors.HTTPException:
+            return
         
     if message.content.startswith('!define'):
         words = message.content
         important_words = words[7:]
-        await message.channel.send(wiki_define(important_words))
+        try:
+            await message.channel.send(wiki_define(important_words))
+        except discord.errors.HTTPException:
+            return
         
     if message.content.startswith('!summary'):
         words = message.content
         important_words = words[8:]
-        await message.channel.send(wiki_summary(important_words))
+        try:
+            await message.channel.send(wiki_summary(important_words))
+        except discord.errors.HTTPException:
+            return
         
     if message.content.startswith('!search'):
         words = message.content
         important_words = words[7:]
-        await message.channel.send(wiki_search(important_words))
+        try:
+            await message.channel.send('`'+wiki_search(important_words)+'`')
+        except discord.errors.HTTPException:
+            return
 
     #################### G R E E T I N G S ######################
 
