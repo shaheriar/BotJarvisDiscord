@@ -10,7 +10,8 @@ Discord Bot project for Rose Hack 2021.
 [Simraj Singh](https://github.com/simrajsingh)
 
 ## Usage
-[Add it to your server!](https://discord.com/oauth2/authorize?client_id=800094180041818112&permissions=8&scope=bot)
+Add it to your server using this [link](https://discord.com/oauth2/authorize?client_id=800094180041818112&permissions=8&scope=bot)
+
 ![help](https://github.com/shaheriar/BotJarvisDiscord/blob/main/unknown.png)
 
 ## Inspiration
