@@ -4,6 +4,7 @@ import os
 import random
 from Parse import parseForTrans
 import discord
+import praw
 import requests
 import json
 import time
@@ -20,9 +21,15 @@ GUILD = '<guild>'
 weatherkey = '3f60abed43493660e7651ea9c58df6fc'
 base_url = "http://api.openweathermap.org/data/2.5/weather?"
 base_news_url =  "https://newsapi.org/v2/top-headlines?language=en&q="
-newsapi = NewsApiClient(api_key='47c3bf3394664eb48d0a803451f2d19c')
+newsapi = NewsApiClient(api_key='<apikey>')
 
 client = discord.Client()
+
+reddit = praw.Reddit(client_id="<clientid>",
+                     client_secret="<clientsecret>",
+                     password="<password>",
+                     user_agent="<useragent>",
+                     username="<username>")
 
 def jokes(f):
     
@@ -141,6 +148,63 @@ async def on_message(message):
         except discord.errors.HTTPException:
             return
 
+        
+    ###################### R E D D I T ########################
+
+    if message.content.startswith('!reddit'):
+        words = message.content
+        important_words = words[8:]
+        print(important_words)
+        async def redditpages(ctx):
+            try:
+                contents = reddit.subreddit(important_words).hot(limit=5)
+            except prawcore.exceptions:
+                await message.channel.send('Error.')
+                return
+            
+            contents = list(contents)
+            pages = 5
+            cur_page = 1
+            message = await ctx.channel.send(f"__**Page {cur_page}/{pages}**__:\n\n{contents[cur_page-1].title}\n{contents[cur_page-1].url}")
+            # getting the message object for editing and reacting
+
+            await message.add_reaction("◀️")
+            await message.add_reaction("▶️")
+
+            def check(reaction, user):
+                return user == ctx.author and str(reaction.emoji) in ["◀️", "▶️"]
+                # This makes sure nobody except the command sender can interact with the "menu"
+
+            while True:
+                try:
+                    reaction, user = await client.wait_for("reaction_add", timeout=60, check=check)
+                    # waiting for a reaction to be added - times out after x seconds, 60 in this
+                    # example
+
+                    if str(reaction.emoji) == "▶️" and cur_page != pages:
+                        cur_page += 1
+                        await message.edit(content=f"__**Page {cur_page}/{pages}**__:\n\n{contents[cur_page-1].title}\n{contents[cur_page-1].url}")
+                        await message.remove_reaction(reaction, user)
+
+                    elif str(reaction.emoji) == "◀️" and cur_page > 1:
+                        cur_page -= 1
+                        await message.edit(content=f"__**Page {cur_page}/{pages}**__:\n\n{contents[cur_page-1].title}\n{contents[cur_page-1].url}")
+                        await message.remove_reaction(reaction, user)
+
+                    else:
+                        await message.remove_reaction(reaction, user)
+                        # removes reactions if the user tries to go forward on the last page or
+                        # backwards on the first page
+                except asyncio.TimeoutError:
+                    await message.delete()
+                    break
+                    # ending the loop if user doesn't react after x seconds
+        try:
+            await redditpages(message)
+        except discord.errors.HTTPException:
+            return
+    
+
     #################### G R E E T I N G S ######################
 
     if message.content.startswith('hey jarvis'):
@@ -176,6 +240,10 @@ async def on_message(message):
     if message.content.startswith('thanks jarvis'):
         words = message.content
         await message.channel.send('You\'re welcome')
+
+    if message.content.startswith('!invite'):
+        words = message.content
+        await message.channel.send('Invite me to other servers using this link: https://discord.com/api/oauth2/authorize?client_id=800094180041818112&permissions=8&scope=bot')
 
     if message.content.startswith('!coin'):
         words = message.content
@@ -347,7 +415,9 @@ async def on_message(message):
         line11 = '**!coin** : Flip a coin!\n'
         line12 = '**!8ball {text}** : Let the magic 8-Ball decide your fate\n'
         line13 = '**!dice** : Roll a dice and get a random number from 1 to 6\n'
-        helptext = line1+line2+line3+line4+line5+line6+line7+line8+line9+line10+line11+line12+line13
+        line14 = '**!reddit {subreddit}** : Get the top 5 posts in a subreddit\n'
+        line15 = '**!invite** : Invite me to other servers!\n'
+        helptext = line1+line2+line3+line4+line5+line6+line7+line8+line9+line10+line11+line12+line13+line14+line15
         await message.channel.send(helptext)
 
     #################### T R A N S L A T E ######################
