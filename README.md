@@ -12,7 +12,7 @@ Discord Bot project for Rose Hack 2021.
 ## Usage
 Add it to your server using this [link](https://discord.com/oauth2/authorize?client_id=800094180041818112&permissions=8&scope=bot)
 
-![help](https://github.com/shaheriar/BotJarvisDiscord/blob/main/help.png)
+![help](https://github.com/shaheriar/BotJarvisDiscord/blob/main/help.PNG)
 
 ## Inspiration
 The inspiration came from Iron Man and his AI Jarvis. We wanted to create an assistant that felt like his AI and could be genuinely useful.
