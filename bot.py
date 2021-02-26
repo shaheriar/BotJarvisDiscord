@@ -10,26 +10,28 @@ import json
 import time
 import wikipedia
 import asyncio
+import secretvars
 from newsapi import NewsApiClient
 from translate import translator
 #from dotenv import load_dotenv
 
 #load_dotenv()
+ss = secretvars.secretvars()
 #translator = translator(service_urls=['translate.googleapis.com'])
-TOKEN = '<token>'
-GUILD = '<guild>'
-weatherkey = '3f60abed43493660e7651ea9c58df6fc'
+TOKEN = ss.tokenid
+GUILD = ss.guild
+weatherkey = ss.weatherkey
 base_url = "http://api.openweathermap.org/data/2.5/weather?"
 base_news_url =  "https://newsapi.org/v2/top-headlines?language=en&q="
-newsapi = NewsApiClient(api_key='<apikey>')
+newsapi = NewsApiClient(api_key=ss.newskey)
 
 client = discord.Client()
 
-reddit = praw.Reddit(client_id="<clientid>",
-                     client_secret="<clientsecret>",
-                     password="<password>",
-                     user_agent="<useragent>",
-                     username="<username>")
+reddit = praw.Reddit(client_id=ss.redditid,
+                     client_secret=ss.redditsecret,
+                     password=ss.redditpassword,
+                     user_agent=ss.useragent,
+                     username=ss.redditusername)
 
 def jokes(f):
     
