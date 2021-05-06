@@ -131,25 +131,25 @@ async def defi(ctx):
     words = ctx.message.content
     important_words = words[7:]
     try:
-        await message.channel.send(wiki_define(important_words))
+        await ctx.send(wiki_define(important_words))
     except discord.errors.HTTPException:
         return
 
 @bot.command(name='summary')
 async def summ(ctx):
-    words = message.content
+    words = ctx.message.content
     important_words = words[8:]
     try:
-        await message.channel.send(wiki_summary(important_words))
+        await ctx.send(wiki_summary(important_words))
     except discord.errors.HTTPException:
         return
     
 @bot.command(name='search')
 async def searc(ctx):
-    words = message.content
+    words = ctx.message.content
     important_words = words[7:]
     try:
-        await message.channel.send('`'+wiki_search(important_words)+'`')
+        await ctx.send('`'+wiki_search(important_words)+'`')
     except discord.errors.HTTPException:
         return
 
