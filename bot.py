@@ -102,9 +102,9 @@ def search(query):
         else: info = ydl.extract_info(query, download=False)
     return (info, info['formats'][0]['url'])
 
-@bot.command(name='play_song')
+@bot.command(name='song')
 async def play(ctx, *, query):
-    await join(ctx)
+    
     #Solves a problem I'll explain later
     FFMPEG_OPTS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
 
@@ -112,6 +112,11 @@ async def play(ctx, *, query):
     server = ctx.message.guild
     voice = server.voice_client
     title = video['title']
+    channel = ctx.author.voice.channel
+    if voice and voice.is_connected():
+        await voice.move_to(channel)
+    else:
+        voice = await channel.connect()
 
     #await join(ctx)
     await ctx.send(f'Now playing ' + title)
@@ -200,7 +205,7 @@ def wiki_search(arg):
 greet = ['Hi ', 'Hello ', 'What\'s up, ', 'Greetings, ', 'Sup ']
 
 
-@client.event
+@bot.event
 async def on_message(message):
     if message.author == client.user:
         return
@@ -495,6 +500,7 @@ async def on_message(message):
             await message.channel.send(weather_description)
         else:
             await message.channel.send('City not found')
+    await bot.process_commands(message)
 
     #################### H E L P ######################
 
@@ -515,7 +521,7 @@ async def help(ctx):
     line13 = '**!dice** : Roll a dice and get a random number from 1 to 6\n'
     line14 = '**!reddit {subreddit}** : Get the top 5 posts in a subreddit\n'
     line15 = '**!invite** : Invite me to other servers!\n'
-    line16 = '**!play_song {query}** : Search or paste a url to play a song in your voice channel\n'
+    line16 = '**!song {query}** : Search or paste a url to play a song in your voice channel\n'
     line17 = '**!leave** : Leave your voice channel\n'
     line18 = '**!pause** : Pause the current song\n'
     line19 = '**!stop** : Stop the current song\n'
