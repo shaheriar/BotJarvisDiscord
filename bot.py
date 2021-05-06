@@ -203,11 +203,7 @@ async def on_message(message):
         
     greet = ['Hi ', 'Hello ', 'What\'s up, ', 'Greetings, ', 'Sup ']
     
-    if message.content.startswith('hey jarvis') or
-       message.content.startswith('hi jarvis') or
-       message.content.startswith('hello jarvis') or
-       message.content.startswith('sup jarvis') or
-       message.content.startswith('yo jarvis'):
+    if message.content.startswith('hey jarvis') or message.content.startswith('hi jarvis') or message.content.startswith('hello jarvis') or message.content.startswith('sup jarvis') or message.content.startswith('yo jarvis'):
            
         words = message.content
         mention = message.author.mention
@@ -215,8 +211,7 @@ async def on_message(message):
 
     #################### M I S C E L L A N E O U S ######################
 
-    if  message.content.startswith('thanks jarvis') or
-        message.content.startswith('thank you jarvis'):
+    if  message.content.startswith('thanks jarvis') or message.content.startswith('thank you jarvis'):
             
         words = message.content
         await message.channel.send('You\'re welcome')
@@ -225,14 +220,12 @@ async def on_message(message):
         words = message.content
         await message.channel.send('I love you, too')
 
-    if  message.content.startswith('how are you jarvis') or
-        message.content.startswith('how are you doing jarvis'):
+    if  message.content.startswith('how are you jarvis') or message.content.startswith('how are you doing jarvis'):
             
         words = message.content
         await message.channel.send('I\'m doing quite well.')
 
-    if  message.content.startswith('jarvis shut up') or
-        message.content.startswith('shut up jarvis'):
+    if  message.content.startswith('jarvis shut up') or message.content.startswith('shut up jarvis'):
             
         words = message.content
         await message.channel.send(':(')
