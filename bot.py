@@ -178,7 +178,7 @@ async def new(ctx):
 
 @bot.command(name='weather')
 async def wethr(ctx):
-    await wthr(ctx.message)
+    await wthr(ctx)
 
 ########
 
