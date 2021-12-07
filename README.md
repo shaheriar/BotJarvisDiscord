@@ -1,6 +1,8 @@
 # Jarvis Discord Assistant
 Discord Bot project for Rose Hack 2021.
 
+Add it to your server using this [link](https://discord.com/oauth2/authorize?client_id=800094180041818112&permissions=8&scope=bot)
+
 ## Project members
 
 [Shaheriar Malik](https://github.com/shaheriar)
@@ -9,8 +11,7 @@ Discord Bot project for Rose Hack 2021.
 
 [Simraj Singh](https://github.com/simrajsingh)
 
-## Usage
-Add it to your server using this [link](https://discord.com/oauth2/authorize?client_id=800094180041818112&permissions=8&scope=bot)
+## Help
 
 ![help](https://github.com/shaheriar/BotJarvisDiscord/blob/main/help.PNG)
 
