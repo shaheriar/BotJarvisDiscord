@@ -12,6 +12,12 @@ def valstats(ctx):
     embed=discord.Embed(title='Valorant Stats for ' + msg[1])
 
     soup = BeautifulSoup(page.content, "html.parser")
+    err = soup.find('div',class_='content content--error')
+    if (err != None):
+        code = err.find('h1')
+        if (code.text == '404'):
+            return discord.Embed(title='Error 404: Player not found on Tracker.gg',description='Please make sure your Riot ID is linked to TRN. https://thetrackernetwork.com/manage/social')
+        
     colors = [discord.Colour.dark_grey(),discord.Colour(9127187), discord.Colour.light_gray(), discord.Colour.gold(),discord.Colour.teal(),discord.Colour.purple(),0xbf374f,0xFFFFFE]
     color = 0
 
