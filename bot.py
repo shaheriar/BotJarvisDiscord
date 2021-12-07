@@ -1,4 +1,5 @@
 import os
+from discord import embeds
 from youtube_dl import YoutubeDL
 import random
 from Parse import parseForTrans
@@ -16,6 +17,7 @@ from helpfunc import hlp
 from wiki import wiki_define,wiki_summary,wiki_search
 from weather import wthr
 from news import newsfunc
+import valorantstats
 import secretvars
 from translate import translator
 
@@ -215,6 +217,12 @@ async def eightball(ctx):
 @bot.command(name='echo')
 async def echo(ctx):
     await ctx.send(ctx.message.content[5:])
+
+########
+
+@bot.command(name='stats')
+async def stat(ctx):
+    await ctx.send(embed=valorantstats.valstats(ctx))
 
 ########
 

@@ -33,11 +33,11 @@ async def newsfunc(ctx, client):
         if x["totalResults"] >= 4:
             contents = [newFormat(0), newFormat(1), newFormat(2), newFormat(3)]
         else:
-            await message.channel.send("Cannot find article")
+            await ctx.send("Cannot find article")
             return
         await newspages(ctx, client, contents)
     else:
-        await message.channel.send('News not found')
+        await ctx.send('News not found')
 
 async def newspages(ctx, client, contents):
     pages = 4
