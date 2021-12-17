@@ -71,4 +71,5 @@ async def wthr(ctx):
         
         await ctx.send(embed=embed)
     except:
-        await ctx.send('City not found')
+        embed=discord.Embed(title='Error '+str(data['error']['code']),description=data['error']['message'])
+        await ctx.send(embed=embed)
