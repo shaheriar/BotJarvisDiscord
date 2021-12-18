@@ -285,7 +285,7 @@ async def on_message(message):
     if message.content.startswith('jarvis tell me a joke'):
         words = message.content
         important_words = words[7:]
-        f = r"https://official-joke-api.appspot.com/random_joke"
+        f = r"https://joke.deno.dev/"
         a = jokes(f)
         await message.channel.send(a["setup"]+'\n'+'||'+a["punchline"]+'||')
 
