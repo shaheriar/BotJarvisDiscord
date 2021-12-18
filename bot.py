@@ -20,6 +20,7 @@ from news import newsfunc
 import valorantstats
 import secretvars
 from translate import translator
+from urllib.parse import quote
 
 ss = secretvars.secretvars()
 TOKEN = ss.tokenid
@@ -223,6 +224,16 @@ async def echo(ctx):
 @bot.command(name='stats')
 async def stat(ctx):
     await ctx.send(embed=valorantstats.valstats(ctx))
+
+########
+
+@bot.command(name='jarvis')
+async def talk(ctx):
+    query = ctx.message.content.split('!jarvis ')[1]
+    url = "https://jarvisrosehack.herokuapp.com/chatter/" + quote(query)
+    response = requests.request("GET", url)
+    print(response.text)
+    await ctx.send(response.text)
 
 ########
 
