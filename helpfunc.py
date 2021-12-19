@@ -19,6 +19,7 @@ def hlp():
     '**!song {query}** : Search or paste a url to play a song in your voice channel\n',
     '**!leave** : Leave your voice channel\n',
     '**!pause** : Pause the current song\n',
+    '**!resume** : Resume the current song\n',
     '**!stop** : Stop the current song\n',
     '**!stats {username#tag}** : Get Valorant stats for any player who has an account on tracker.gg\n'
     ]
