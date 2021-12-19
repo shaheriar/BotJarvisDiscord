@@ -1,17 +1,11 @@
-import os
-from discord import embeds
 from youtube_dl import YoutubeDL
 import random
 from Parse import parseForTrans
 from langs import pages
 from reddit import subreddit
-from discord.utils import get
-from requests import get
 import discord
-from discord.ext import commands,tasks
-import praw
+from discord.ext import commands
 import requests
-import json
 import time
 from helpfunc import hlp
 from wiki import wiki_define,wiki_summary,wiki_search
@@ -251,13 +245,6 @@ async def talk(ctx):
 
 ########
 
-def jokes(f):
-    data = requests.get(f)
-    tt = json.loads(data.text)
-    return tt
-
-########
-
 @bot.event
 async def on_message(message):
     if message.author == client.user:
@@ -308,10 +295,7 @@ async def on_message(message):
 ########
 
     if message.content.startswith('jarvis tell me a joke'):
-        words = message.content
-        important_words = words[7:]
-        f = r"https://joke.deno.dev/"
-        a = jokes(f)
+        a = requests.get("https://joke.deno.dev/").json()
         await message.channel.send(a["setup"]+'\n'+'||'+a["punchline"]+'||')
 
 ########
