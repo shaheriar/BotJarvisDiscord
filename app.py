@@ -29,15 +29,11 @@ trainer = ChatterBotCorpusTrainer(chatterbot)
 # Train the chatbot based on the english corpus
 trainer.train(
     "chatterbot.corpus.english.ai",
-"chatterbot.corpus.english.botprofile",
-"chatterbot.corpus.english.computers",
-"chatterbot.corpus.english.conversations",
-"chatterbot.corpus.english.emotion",
-"chatterbot.corpus.english.food",
-"chatterbot.corpus.english.greetings",
-"chatterbot.corpus.english.health",
-"chatterbot.corpus.english.money",
-"chatterbot.corpus.english.psychology",
+    "chatterbot.corpus.english.botprofile",
+    "chatterbot.corpus.english.computers",
+    "chatterbot.corpus.english.conversations",
+    "chatterbot.corpus.english.greetings",
+    "chatterbot.corpus.english.psychology",
 )
 
 ###

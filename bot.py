@@ -21,6 +21,8 @@ import valorantstats
 import secretvars
 from translate import translator
 from urllib.parse import quote
+from crypto import crypto
+from stocks import stocks
 
 ss = secretvars.secretvars()
 TOKEN = ss.tokenid
@@ -224,6 +226,18 @@ async def echo(ctx):
 @bot.command(name='stats')
 async def stat(ctx):
     await ctx.send(embed=valorantstats.valstats(ctx))
+
+########
+
+@bot.command(name='crypto')
+async def cryp(ctx):
+    await crypto(ctx)
+
+########
+
+@bot.command(name='stocks')
+async def cryp(ctx):
+    await stocks(ctx)
 
 ########
 
