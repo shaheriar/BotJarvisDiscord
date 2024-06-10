@@ -1,9 +1,10 @@
-from youtube_dl import YoutubeDL
+from yt_dlp import YoutubeDL
 import random
 from Parse import parseForTrans
 from langs import pages
-from reddit import subreddit
+# from reddit import subreddit
 import discord
+from discord.utils import get
 from discord.ext import commands
 import requests
 import time
@@ -13,7 +14,7 @@ from weather import wthr
 from news import newsfunc
 import valorantstats
 import secretvars
-from translate import translator
+# from translate import translator
 from urllib.parse import quote
 from crypto import crypto
 from stocks import stocks
@@ -47,6 +48,8 @@ async def on_ready():
 @bot.command(name='leave')
 async def leave(ctx):
     voice_client = ctx.message.guild.voice_client
+    if voice_client is None or not voice_client.is_connected():
+        await voice_client.connect()
     if voice_client.is_connected():
         await voice_client.disconnect()
     else:
@@ -59,37 +62,42 @@ def search(query):
         try: requests.get(query)
         except: info = ydl.extract_info(f"ytsearch:{query}", download=False)['entries'][0]
         else: info = ydl.extract_info(query, download=False)
-    return (info, info['formats'][0]['url'])
+    return (info, info['url'])
 
 ########
 
 @bot.command(name='song')
 async def play(ctx, *, query):
-    
-    FFMPEG_OPTS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
-
+    await ctx.send('Searching for \"' + query + "\"...")
     video, source = search(query)
     server = ctx.message.guild
     voice = server.voice_client
     title = video['title']
+    thumbnail = video['thumbnails'][0]
     channel = ctx.author.voice.channel
     if voice and voice.is_connected():
         await voice.move_to(channel)
     else:
         voice = await channel.connect()
+    embed = discord.Embed(title='Now playing')
+    embed.add_field(name='Song', value=title)
+    embed.set_thumbnail(url=thumbnail['url'])
+    await ctx.send(embed=embed)
 
-    await ctx.send(f'Now playing ' + title)
-
-    voice.play(discord.FFmpegPCMAudio(source, **FFMPEG_OPTS), after=lambda e: print('done', e))
-    voice.is_playing()
+    voice.play(discord.FFmpegPCMAudio(source), after=lambda e: print('done', e))
+    # while voice.is_playing():
+    #     continue
+    # await voice.disconnect()
 
 ########
 
 @bot.command(name='pause')
 async def pause(ctx):
     voice_client = ctx.message.guild.voice_client
+    if voice_client is None or not voice_client.is_connected():
+        await voice_client.connect()
     if voice_client.is_playing():
-        await voice_client.pause()
+        voice_client.pause()
         await ctx.send("Paused.")
     else:
         await ctx.send("The bot is not playing anything at the moment.")
@@ -99,8 +107,10 @@ async def pause(ctx):
 @bot.command(name='resume')
 async def resume(ctx):
     voice_client = ctx.message.guild.voice_client
+    if voice_client is None or not voice_client.is_connected():
+        await voice_client.connect()
     if voice_client.is_paused():
-        await voice_client.resume()
+        voice_client.resume()
         await ctx.send("Resuming.")
     else:
         await ctx.send("The bot was not playing anything before this. Use play_song command")
@@ -110,8 +120,10 @@ async def resume(ctx):
 @bot.command(name='stop')
 async def stop(ctx):
     voice_client = ctx.message.guild.voice_client
+    if voice_client is None or not voice_client.is_connected():
+        await voice_client.connect()
     if voice_client.is_playing():
-        await voice_client.stop()
+        voice_client.stop()
         await ctx.send("Stopped.")
     else:
         await ctx.send("The bot is not playing anything at the moment.")
@@ -130,9 +142,9 @@ async def langs(ctx):
 
 ########
 
-@bot.command(name='reddit')
-async def reddit(ctx):
-    await subreddit(ctx, bot)
+# @bot.command(name='reddit')
+# async def reddit(ctx):
+#     await subreddit(ctx, bot)
 
 ########
 
@@ -141,8 +153,10 @@ async def defi(ctx):
     words = ctx.message.content
     important_words = words[7:]
     try:
-        await ctx.send(wiki_define(important_words))
-    except discord.errors.HTTPException:
+        embed=wiki_define(important_words)
+        await ctx.send(embed=embed)
+    except discord.errors.HTTPException as e:
+        print("HTTP Exception", e)
         return
 
 ########
@@ -152,8 +166,10 @@ async def summ(ctx):
     words = ctx.message.content
     important_words = words[8:]
     try:
-        await ctx.send(wiki_summary(important_words))
-    except discord.errors.HTTPException:
+        embed=wiki_summary(important_words)
+        await ctx.send(embed=embed)
+    except discord.errors.HTTPException as e:
+        print("HTTP Exception", e)
         return
 
 ########
@@ -188,8 +204,8 @@ async def invite(ctx):
 ########
             
 greet = ['Hi ', 'Hello ', 'What\'s up, ', 'Greetings, ', 'Sup ']
-coin = ['Heads!', 'Tails!']
-ball =['As I see it, yes.', 'Ask again later.','Better not tell you now.','Cannot predict now.','Concentrate and ask again.','Don’t count on it.','It is certain.','It is decidedly so.','Most likely.','My reply is no.','My sources say no.','Outlook not so good.','Outlook good.','Reply hazy, try again.','Signs point to yes.','Very doubtful.','Without a doubt.','Yes.','Yes – definitely.','You may rely on it.']
+
+ball = ['As I see it, yes.', 'Ask again later.','Better not tell you now.','Cannot predict now.','Concentrate and ask again.','Don’t count on it.','It is certain.','It is decidedly so.','Most likely.','My reply is no.','My sources say no.','Outlook not so good.','Outlook good.','Reply hazy, try again.','Signs point to yes.','Very doubtful.','Without a doubt.','Yes.','Yes – definitely.','You may rely on it.']
 
 ########
 
@@ -201,7 +217,7 @@ async def dice(ctx):
     
 @bot.command(name='coin')
 async def coin(ctx):
-    await ctx.send(random.choice(coin))
+    await ctx.send(random.choice(['Heads!', 'Tails!']))
 
 ########
 
@@ -217,9 +233,9 @@ async def echo(ctx):
 
 ########
 
-@bot.command(name='stats')
-async def stat(ctx):
-    await ctx.send(embed=valorantstats.valstats(ctx))
+# @bot.command(name='stats')
+# async def stat(ctx):
+#     await ctx.send(embed=valorantstats.valstats(ctx))
 
 ########
 
@@ -235,13 +251,13 @@ async def cryp(ctx):
 
 ########
 
-@bot.command(name='jarvis')
-async def talk(ctx):
-    query = ctx.message.content.split('!jarvis ')[1]
-    url = "https://jarvisrosehack.herokuapp.com/chatter/" + quote(query)
-    response = requests.request("GET", url)
-    print(response.text)
-    await ctx.send(response.text)
+# @bot.command(name='jarvis')
+# async def talk(ctx):
+#     query = ctx.message.content.split('!jarvis ')[1]
+#     url = "https://jarvisrosehack.herokuapp.com/chatter/" + quote(query)
+#     response = requests.request("GET", url)
+#     print(response.text)
+#     await ctx.send(response.text)
 
 ########
 
@@ -252,14 +268,14 @@ async def on_message(message):
 
 ########
     
-    if message.content[:3] == '!t ':
-        parsedWordArray = parseForTrans(message.content)
-        response = translateFeature(parsedWordArray[0], parsedWordArray[1], parsedWordArray[2])
-        try:
-            await message.channel.send(response)
-            time.sleep(1)
-        except discord.errors.HTTPException:
-            return
+    # if message.content[:3] == '!t ':
+    #     parsedWordArray = parseForTrans(message.content)
+    #     response = translateFeature(parsedWordArray[0], parsedWordArray[1], parsedWordArray[2])
+    #     try:
+    #         await message.channel.send(response)
+    #         time.sleep(1)
+    #     except discord.errors.HTTPException:
+    #         return
 
 ########
     

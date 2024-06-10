@@ -1,3 +1,4 @@
-requirements.txt
 Procfile
 secretvars.py
+env
+__pycache__

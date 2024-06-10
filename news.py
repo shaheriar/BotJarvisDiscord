@@ -2,13 +2,13 @@ import wikipedia
 import requests
 import json
 import asyncio
-from newsapi import NewsApiClient
+# from newsapi import NewsApiClient
 import secretvars
 
 ss = secretvars.secretvars()
 
 base_news_url =  "https://newsapi.org/v2/top-headlines?language=en&q="
-newsapi = NewsApiClient(api_key=ss.newskey)
+# newsapi = NewsApiClient(api_key=ss.newskey)
 
 async def newsfunc(ctx, client):
     words = ctx.message.content
