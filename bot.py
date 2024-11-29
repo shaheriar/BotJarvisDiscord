@@ -75,28 +75,32 @@ def search(query):
 async def gpt(ctx):
     query = ctx.message.content.split('!jarvis ')[1]
     sender = str(ctx.message.author.id)
+    server = str(ctx.message.guild)
     async with ctx.typing():
         message={
             "role": "user",
             "content": query
         }
-        if sender not in messages:
-            messages[sender] = [message]
+        if server not in messages:
+            messages[server] = dict()
+        if sender not in messages[server]:
+            messages[server][sender] = [message]
         else:
-            if len(messages[sender]) > 100:
-                messages[sender] = messages[sender][50:] # Pruning the list
-            messages[sender].append(message)
+            if len(messages[server][sender]) > 100:
+                messages[server][sender] = messages[server][sender][50:] # Pruning the list
+            messages[server][sender].append(message)
         response = gptClient.chat.completions.create(
             model="gpt-4o-mini",
-            messages=messages[sender]
+            messages=messages[server][sender]
         )
         response = response.choices[0].message.content
-        messages[sender].append({
+        messages[server][sender].append({
             "role": "assistant",
             "content": response
         })
     await ctx.send(response)
-    
+
+########
 
 @bot.command(name='song')
 async def play(ctx, *, query):
