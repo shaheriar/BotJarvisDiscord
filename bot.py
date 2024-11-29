@@ -98,7 +98,12 @@ async def gpt(ctx):
             "role": "assistant",
             "content": response
         })
-    await ctx.send(response)
+        if (len(response) > 2000):
+            parts = [response[i:i+2000] for i in range(0, len(response), 2000)]
+            for part in parts:
+                await ctx.send(part)
+        else:
+            await ctx.send(response)
 
 ########
 
