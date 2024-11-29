@@ -4,6 +4,8 @@ from Parse import parseForTrans
 from langs import pages
 # from reddit import subreddit
 import discord
+import socket
+from aiohttp import ClientConnectorError
 from discord.utils import get
 from discord.ext import commands
 import requests
@@ -18,6 +20,7 @@ import secretvars
 from urllib.parse import quote
 from crypto import crypto
 from stocks import stocks
+from openai import OpenAI
 
 ss = secretvars.secretvars()
 TOKEN = ss.tokenid
@@ -27,6 +30,8 @@ client = discord.Client(intents=intents)
 bot = commands.Bot(command_prefix='!',intents=intents)
 bot.remove_command('help')
 
+gptClient = OpenAI(api_key=ss.gptkey)
+messages = dict()
 ffmpeg_options = {
     'options': '-vn'
 }
@@ -36,12 +41,12 @@ async def on_ready():
     game = discord.Game("!help")
     await bot.change_presence(activity=game)
     for guild in bot.guilds:
-        print(f'{client.user} is connected to the following guild:\n{guild.name}(id: {guild.id})\n')
+        #print(f'{client.user} is connected to the following guild:\n{guild.name}(id: {guild.id})\n')
         if guild.name == GUILD:
             break
 
-    members = '\n - '.join([member.name for member in guild.members])
-    print(f'Guild Members:\n - {members}')
+    #members = '\n - '.join([member.name for member in guild.members])
+    #print(f'Guild Members:\n - {members}')
 
 ##################### M U S I C #######################
 
@@ -65,6 +70,33 @@ def search(query):
     return (info, info['url'])
 
 ########
+
+@bot.command(name='jarvis')
+async def gpt(ctx):
+    query = ctx.message.content.split('!jarvis ')[1]
+    sender = str(ctx.message.author.id)
+    async with ctx.typing():
+        message={
+            "role": "user",
+            "content": query
+        }
+        if sender not in messages:
+            messages[sender] = [message]
+        else:
+            if len(messages[sender]) > 100:
+                messages[sender] = messages[sender][50:] # Pruning the list
+            messages[sender].append(message)
+        response = gptClient.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages[sender]
+        )
+        response = response.choices[0].message.content
+        messages[sender].append({
+            "role": "assistant",
+            "content": response
+        })
+    await ctx.send(response)
+    
 
 @bot.command(name='song')
 async def play(ctx, *, query):
@@ -203,7 +235,7 @@ async def invite(ctx):
 
 ########
             
-greet = ['Hi ', 'Hello ', 'What\'s up, ', 'Greetings, ', 'Sup ']
+greet = ['Hi ', 'Hello ', 'What\'s up, ', 'Greetings, ', 'Sup ', 'Howdy ', 'Hey ']
 
 ball = ['As I see it, yes.', 'Ask again later.','Better not tell you now.','Cannot predict now.','Concentrate and ask again.','Don’t count on it.','It is certain.','It is decidedly so.','Most likely.','My reply is no.','My sources say no.','Outlook not so good.','Outlook good.','Reply hazy, try again.','Signs point to yes.','Very doubtful.','Without a doubt.','Yes.','Yes – definitely.','You may rely on it.']
 
@@ -320,10 +352,15 @@ async def on_message(message):
 
 ########
 
-def translateFeature(srcLang, destLang, message):
-    response = translator(srcLang, destLang, message)
-    print('PRINTING RESPONSE')
-    print(response[0][0][0])
-    return response[0][0][0]
-
-bot.run(TOKEN)
+# def translateFeature(srcLang, destLang, message):
+#     response = translator(srcLang, destLang, message)
+#     print('PRINTING RESPONSE')
+#     print(response[0][0][0])
+#     return response[0][0][0]
+try:
+    bot.run(TOKEN)
+except Exception as e:
+    print("An error occured. Restarting the bot in 5 seconds.")
+    time.sleep(5)
+    print(e)
+    exit()

@@ -18,7 +18,10 @@ async def stocks(ctx):
         search = requests.get(search_url).json()['result'][0]
         info_url = base_url+'quote?symbol='+search['symbol']+token_url
         info = requests.get(info_url).json()
-        logo = requests.get(base_url+'stock/profile2?symbol='+search['symbol']+token_url).json()['logo']
+        try:
+            logo = requests.get(base_url+'stock/profile2?symbol='+search['symbol']+token_url).json()['logo']
+        except:
+            logo = ''
         embed = discord.Embed(title='Today\'s Stock Market Information for '+search['symbol'])
         
         embed.add_field(name='Name',value=search['description'],inline=False)
@@ -32,9 +35,11 @@ async def stocks(ctx):
         
         embed.add_field(name='Previous Close Price',value='$'+str(info['pc']),inline=True)
         embed.set_footer(text=datetime.now().strftime("%m/%d/%Y, %H:%M:%S"))
-        embed.set_thumbnail(url=logo)
+        if (logo != ''):
+            embed.set_thumbnail(url=logo)
 
         await ctx.send(embed=embed)
 
-    except:
+    except Exception as e:
+        print(e)
         await ctx.send(embed=discord.Embed(title='Error',description='Could not find any data under that name.'))
