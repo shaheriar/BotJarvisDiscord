@@ -32,9 +32,15 @@ async def on_ready() -> None:
 async def on_message(message: discord.Message) -> None:
     if message.author == bot.user:
         return
+    # Legacy notice for removed !jarvis command.
+    if message.content.strip().lower().startswith("!jarvis"):
+        await message.channel.send(
+            "The `!jarvis` command has been removed. Please mention me instead, e.g. `@Jarvis what's the weather in New York?`"
+        )
+        return
     if bot.user in message.mentions and not message.content.strip().startswith("!"):
         ctx = await bot.get_context(message)
-        jarvis_cmd = bot.get_command("jarvis")
+        jarvis_cmd = bot.get_command("_jarvis_internal")
         if jarvis_cmd:
             await ctx.invoke(jarvis_cmd)
         return

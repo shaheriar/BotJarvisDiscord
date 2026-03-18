@@ -82,6 +82,18 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "get_invite_link",
+            "description": "Get the bot invite link when the user asks how to add Jarvis to another server.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "translate_text",
             "description": "Translate text into another language using DeepL. Use when the user asks to translate or to respond in a different language.",
             "parameters": {
@@ -116,7 +128,7 @@ LAST_CRYPTO_BY_SESSION: dict[str, dict] = {}
 
 JARVIS_SYSTEM = (
     "You are Jarvis, a helpful, concise AI assistant running inside a Discord bot. "
-    "You have access to tools: web_search, get_weather, get_stock, get_crypto, wikipedia_lookup, get_news, translate_text. Use them when they would help answer the user; cite sources briefly when appropriate. "
+    "You have access to tools: web_search, get_weather, get_stock, get_crypto, wikipedia_lookup, get_news, translate_text, get_invite_link. Use them when they would help answer the user; cite sources briefly when appropriate. "
     "When the user asks for several different things (e.g. weather and news, or stock and crypto), call all relevant tools in the same turn so you can combine the information and list all sources. "
     "Always keep responses reasonably short and to the point, unless the user explicitly asks for more detail. "
     "Avoid tasks that would consume a very large number of tokens. If a user asks for something that would use an unusually large amount of tokens, politely decline and ask them to narrow or summarize their request instead."
@@ -177,6 +189,11 @@ async def _run_tool(name: str, arguments: dict) -> tuple[str, str]:
                 formality=arguments.get("formality"),
             )
             return translate_svc.format_translation_as_text(data), "DeepL"
+        if name == "get_invite_link":
+            return (
+                f"Invite me to other servers using this link: {config.INVITE_LINK}",
+                "Invite",
+            )
     except Exception as e:
         logger.exception("Tool execution failed")
         return f"Tool error: {e}", name
@@ -233,7 +250,7 @@ class Jarvis(commands.Cog):
             if part:
                 await ctx.send(part)
 
-    @commands.command(name="jarvis")
+    @commands.command(name="_jarvis_internal")
     async def jarvis(self, ctx: commands.Context, *, query: str = "") -> None:
         sender = str(ctx.message.author.id)
         if sender in config.BANNED_USER_IDS:
@@ -243,9 +260,7 @@ class Jarvis(commands.Cog):
             )
             return
         raw_content = ctx.message.content
-        if "!jarvis " in raw_content:
-            query = raw_content.split("!jarvis ", 1)[1].strip()
-        elif self.bot.user and self.bot.user in ctx.message.mentions:
+        if self.bot.user and self.bot.user in ctx.message.mentions:
             query = raw_content.replace(f"<@{self.bot.user.id}>", "").replace(f"<@!{self.bot.user.id}>", "").strip()
         if not query:
             await ctx.send(

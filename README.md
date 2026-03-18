@@ -50,17 +50,16 @@ python bot.py
 | Command | Description |
 |---------|-------------|
 | `@Jarvis <question>` | Primary way to talk to Jarvis. Uses GPT with web search, weather (current & historical), stocks & crypto (current & range performance), news, and Wikipedia (define, summarize, search). |
-| `!jarvis <question>` | Legacy command (still works) but is deprecated in favor of `@Jarvis`. |
 | `!invite` | Bot invite link. |
 
 ---
 
 ## What Jarvis can do
 
-- **AI chat** — Ask questions via `@Jarvis` (or `!jarvis` as a legacy fallback); responses use GPT-4o-mini with conversation memory and optional tools.
+- **AI chat** — Ask questions via `@Jarvis`; responses use GPT-4o-mini with conversation memory and optional tools.
 - **Tools** — Jarvis can call web search (DuckDuckGo), weather (WeatherAPI, including historical dates), stocks (Finnhub, including simple range performance), crypto (Messari, current market data), news (NewsAPI), Wikipedia (define, summarize, search), and DeepL for translation between languages when relevant.
 - **Reply context** — Reply to any message and use `!jarvis` or `@Jarvis` to ask about that message.
-- **Dedicated commands** — Minimal: `!invite`. Most functionality (search, weather, stocks, crypto, news, etc.) is accessed via `@Jarvis` (or `!jarvis` as a legacy fallback).
+- **Dedicated commands** — Minimal: `!invite`. Most functionality (search, weather, stocks, crypto, news, etc.) is accessed via `@Jarvis`.
 - **Greetings** — Responds to “hey jarvis”, “thanks jarvis”, “jarvis tell me a joke”, etc.
 
 ---
