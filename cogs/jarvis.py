@@ -72,13 +72,17 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_crypto",
-            "description": "Get cryptocurrency price and market data. Use symbol like 'btc', 'eth'. Empty string returns top coins.",
+            "description": "Get cryptocurrency price and market data. Use symbol like 'btc', 'eth'. Empty string returns top coins. Can also include a range for performance over time.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "name": {
                         "type": "string",
                         "description": "Crypto symbol (e.g. btc, eth) or empty for top list",
+                    },
+                    "range": {
+                        "type": "string",
+                        "description": "Optional performance range such as '1m', '3m', '6m', '1y', or 'ytd' when the user asks about performance over time (e.g. 'this year', 'last 3 months').",
                     },
                 },
                 "required": ["name"],
@@ -186,7 +190,7 @@ async def _run_tool(name: str, arguments: dict) -> tuple[str, str]:
             session_key = arguments.pop("_jarvis_session", None)
             data = await crypto_svc.get_crypto_data(
                 arguments.get("name"),
-                None,
+                arguments.get("range"),
                 api_key=config.COINGECKO_API_KEY,
             )
             if session_key and "error" not in data:
