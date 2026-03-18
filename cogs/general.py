@@ -7,17 +7,17 @@ from discord.ext import commands
 import config
 
 HELP_LINES = [
-    "**HELP PAGE",
-    "__LIST OF COMMANDS__**",
-    "**!help** : Opens the help page",
-    "**!weather {city}** : Get weather info for any city",
-    "**!crypto (optional){symbol}** : Get crypto information in general or about a specific currency",
-    "**!stocks {stock}** : Get stock market information about a specific stock",
-    "**!coin** : Flip a coin!",
-    "**!8ball {text}** : Let the magic 8-Ball decide your fate",
-    "**!dice** : Roll a dice and get a random number from 1 to 6",
-    "**!invite** : Invite me to other servers!",
-    "**!jarvis {question}** or @Jarvis : Ask Jarvis anything (search, define, summarize, weather, stocks, crypto, etc.)",
+    "**HELP PAGE — LIST OF COMMANDS**",
+    "",
+    "**!help** — Opens this help page",
+    "**!weather** <city> — Get weather for any city",
+    "**!stocks** <symbol> — Get stock quote (e.g. AAPL)",
+    "**!crypto** [symbol] — Top coins, or details for btc, eth, etc.",
+    "**!coin** — Flip a coin",
+    "**!8ball** [question] — Magic 8-Ball answer",
+    "**!dice** — Roll a die (1–6)",
+    "**!invite** — Get the bot invite link",
+    "**!jarvis** <question> or @Jarvis — Ask Jarvis (search, weather, stocks, crypto, news, etc.)",
 ]
 
 EIGHTBALL_RESPONSES = [
