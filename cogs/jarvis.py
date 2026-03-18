@@ -2,7 +2,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import discord
 import openai
@@ -328,10 +328,16 @@ class Jarvis(commands.Cog):
             )
             return
 
-        today = datetime.now().strftime("%A, %B %d, %Y")
+        now_utc = datetime.now(timezone.utc)
+        today = now_utc.strftime("%A, %B %d, %Y")
+        current_utc = now_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
         system_message = {
             "role": "system",
-            "content": JARVIS_SYSTEM + f"\n\nToday's date is {today}. When the user asks for the current year, date, or time, use this date.",
+            "content": (
+                JARVIS_SYSTEM
+                + f"\n\nToday's date is {today}. Current date and time in UTC: {current_utc}. "
+                "When the user asks for the current time, date, or time in a city or timezone, use this UTC moment as the reference and compute the local time (e.g. Karachi = Pakistan Standard Time = UTC+5). Answer with the actual time; do not say you cannot provide it."
+            ),
         }
         user_message = {"role": "user", "content": query}
         if server not in self._messages:
