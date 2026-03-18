@@ -266,18 +266,16 @@ class Jarvis(commands.Cog):
         self, ctx: commands.Context, response: str, used_sources: list[str]
     ) -> None:
         """Send response as plain message(s), splitting at 2000 chars if needed."""
-        if not response.strip() and not used_sources:
+        # Sources are intentionally suppressed (commented-out behavior) so we don't
+        # append a trailing "Sources: ..." line after the assistant message.
+        if not response.strip():
             return
         body = (response.strip() or "")
-        suffix = ("\nSources: " + ", ".join(used_sources)) if used_sources else ""
         body_parts = [body[i : i + 2000] for i in range(0, len(body), 2000)] if body else []
         if not body_parts:
             body_parts = [""]
-        last = body_parts[-1] + suffix
-        if len(last) > 2000:
-            body_parts.append(suffix.strip())
-        else:
-            body_parts[-1] = last
+        # Disabled: suffix = ("\nSources: " + ", ".join(used_sources)) if used_sources else ""
+        # Disabled: logic that appends/splits that suffix onto the message body.
         for part in body_parts:
             if part:
                 await ctx.send(part)
@@ -479,7 +477,6 @@ class Jarvis(commands.Cog):
                     self._messages[server][sender].append({"role": "assistant", "content": final_content})
 
                 if "NewsAPI" in used_sources:
-                    session_key = f"{server}:{sender}"
                     data = LAST_NEWS_BY_SESSION.get(session_key)
                     if data:
                         pages = news_svc.build_news_embeds(data)
@@ -489,7 +486,6 @@ class Jarvis(commands.Cog):
                         LAST_NEWS_BY_SESSION.pop(session_key, None)
 
                 if "WeatherAPI" in used_sources:
-                    session_key = f"{server}:{sender}"
                     data = LAST_WEATHER_BY_SESSION.get(session_key)
                     if data:
                         embed = weather_svc.build_weather_embed(data)
@@ -497,7 +493,6 @@ class Jarvis(commands.Cog):
                         LAST_WEATHER_BY_SESSION.pop(session_key, None)
 
                 if "Finnhub" in used_sources:
-                    session_key = f"{server}:{sender}"
                     data = LAST_STOCK_BY_SESSION.get(session_key)
                     if data:
                         embed = stocks_svc.build_stock_embed(data)
@@ -505,7 +500,6 @@ class Jarvis(commands.Cog):
                         LAST_STOCK_BY_SESSION.pop(session_key, None)
 
                 if "CoinGecko" in used_sources:
-                    session_key = f"{server}:{sender}"
                     data = LAST_CRYPTO_BY_SESSION.get(session_key)
                     if data:
                         embed = crypto_svc.build_crypto_embed(data)

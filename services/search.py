@@ -1,6 +1,5 @@
 """Web search service (DuckDuckGo). Returns formatted text for Jarvis."""
 import logging
-from typing import Any
 
 from ddgs import DDGS
 
@@ -34,20 +33,3 @@ def web_search(
     except Exception as e:
         logger.exception("Web search error")
         return f"[Web search failed: {e}]"
-
-
-def web_search_results(query: str, max_results: int = 5) -> list[dict[str, Any]]:
-    """
-    Run DuckDuckGo search and return list of {"title", "body", "href"}.
-    For callers that want structured data.
-    """
-    try:
-        results = DDGS().text(query, max_results=max_results)
-        results = list(results) if results else []
-        return [
-            {"title": r.get("title", ""), "body": r.get("body", ""), "href": r.get("href", "")}
-            for r in results[:max_results]
-        ]
-    except Exception as e:
-        logger.exception("Web search error")
-        return []

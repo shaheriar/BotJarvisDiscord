@@ -27,6 +27,7 @@ FINNHUB_API_KEY = _get("FINNHUB_API_KEY")
 NEWS_API_KEY = _get("NEWS_API_KEY")
 OPENAI_API_KEY = _get("OPENAI_API_KEY")
 COINGECKO_API_KEY = _get("COINGECKO_API_KEY")
+DEEPL_API_KEY = _get("DEEPL_API_KEY")
 
 # Invite link: optional BOT_CLIENT_ID env; default for backward compatibility
 BOT_CLIENT_ID = _get("BOT_CLIENT_ID")

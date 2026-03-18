@@ -212,7 +212,6 @@ def build_crypto_embed(data: dict[str, Any]) -> discord.Embed:
     """Build Discord embed from crypto service dict."""
     if "error" in data:
         return discord.Embed(title="Error", description=data["error"], color=0xE74C3C)
-    from datetime import datetime as _dt
 
     if "coins" in data:
         embed = discord.Embed(title="Cryptocurrency Market Today")
@@ -222,7 +221,7 @@ def build_crypto_embed(data: dict[str, Any]) -> discord.Embed:
                 value=f"${round(c['price_usd'], 5)}",
                 inline=True,
             )
-        embed.set_footer(text=_dt.now().strftime("%m/%d/%Y, %H:%M:%S"))
+        embed.set_footer(text=datetime.now().strftime("%m/%d/%Y, %H:%M:%S"))
         return embed
     # Single coin
     name = data["name"]
@@ -248,5 +247,5 @@ def build_crypto_embed(data: dict[str, Any]) -> discord.Embed:
             ),
             inline=False,
         )
-    embed.set_footer(text=_dt.now().strftime("%m/%d/%Y, %H:%M:%S"))
+    embed.set_footer(text=datetime.now().strftime("%m/%d/%Y, %H:%M:%S"))
     return embed

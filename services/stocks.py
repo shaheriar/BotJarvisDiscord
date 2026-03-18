@@ -157,9 +157,8 @@ def build_stock_embed(data: dict[str, Any]) -> discord.Embed:
     embed.add_field(name="Low", value=f"${data['low']}", inline=True)
     embed.add_field(name="Open", value=f"${data['open']}", inline=True)
     embed.add_field(name="Previous Close Price", value=f"${data['previous_close']}", inline=True)
-    from datetime import datetime as _dt
 
-    embed.set_footer(text=_dt.now().strftime("%m/%d/%Y, %H:%M:%S"))
+    embed.set_footer(text=datetime.now().strftime("%m/%d/%Y, %H:%M:%S"))
     hist = data.get("history")
     if hist:
         embed.add_field(
