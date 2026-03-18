@@ -44,6 +44,7 @@ class Jarvis(commands.Cog):
             r = await self._client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
+                temperature=0,
                 max_tokens=400,
             )
             return (r.choices[0].message.content or "").strip()
@@ -174,6 +175,8 @@ class Jarvis(commands.Cog):
                     messages=msg_list,
                     tools=tool_defs.TOOLS,
                     tool_choice="auto",
+                    temperature=config.JARVIS_TOOL_TEMPERATURE,
+                    max_tokens=config.JARVIS_TOOL_CALL_MAX_TOKENS,
                 )
                 break
             except Exception as api_err:
@@ -276,6 +279,10 @@ class Jarvis(commands.Cog):
                     messages=msg_list,
                     tools=tool_defs.TOOLS,
                     tool_choice="auto",
+                    # This call happens after tool execution; allow more expressive output
+                    # while still permitting additional tool calls if needed.
+                    temperature=config.JARVIS_RESPONSE_TEMPERATURE,
+                    max_tokens=config.JARVIS_TOOL_REQUERY_MAX_TOKENS,
                 )
             except Exception:
                 await ctx.send(
@@ -398,6 +405,8 @@ class Jarvis(commands.Cog):
                 response_obj = await self._client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=msg_list,
+                    temperature=config.JARVIS_RESPONSE_TEMPERATURE,
+                    max_tokens=config.JARVIS_FINAL_RESPONSE_MAX_TOKENS,
                 )
             except Exception:
                 await ctx.send(

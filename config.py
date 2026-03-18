@@ -9,6 +9,25 @@ import os
 def _get(key: str, default: str = "") -> str:
     return os.getenv(key, default).strip()
 
+def _get_float(key: str, default: float) -> float:
+    raw = os.getenv(key)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return float(raw.strip())
+    except ValueError:
+        return default
+
+
+def _get_int(key: str, default: int) -> int:
+    raw = os.getenv(key)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return int(float(raw.strip()))
+    except ValueError:
+        return default
+
 
 # Discord
 DISCORD_TOKEN = _get("DISCORD_TOKEN")
@@ -34,3 +53,11 @@ BOT_CLIENT_ID = _get("BOT_CLIENT_ID")
 INVITE_LINK = (
     f"https://discord.com/api/oauth2/authorize?client_id={BOT_CLIENT_ID}&permissions=8&scope=bot"
 )
+
+# Jarvis LLM tuning
+# These are env-overridable so you can tune quality/cost without redeploying code.
+JARVIS_TOOL_TEMPERATURE = _get_float("JARVIS_TOOL_TEMPERATURE", 0.1)
+JARVIS_RESPONSE_TEMPERATURE = _get_float("JARVIS_RESPONSE_TEMPERATURE", 0.5)
+JARVIS_TOOL_CALL_MAX_TOKENS = _get_int("JARVIS_TOOL_CALL_MAX_TOKENS", 256)
+JARVIS_TOOL_REQUERY_MAX_TOKENS = _get_int("JARVIS_TOOL_REQUERY_MAX_TOKENS", 512)
+JARVIS_FINAL_RESPONSE_MAX_TOKENS = _get_int("JARVIS_FINAL_RESPONSE_MAX_TOKENS", 640)
