@@ -24,7 +24,7 @@ NEWS_API_KEY = _get("NEWS_API_KEY")
 OPENAI_API_KEY = _get("OPENAI_API_KEY")
 
 # Invite link: optional BOT_CLIENT_ID env; default for backward compatibility
-BOT_CLIENT_ID = _get("BOT_CLIENT_ID") or "800094180041818112"
+BOT_CLIENT_ID = _get("BOT_CLIENT_ID")
 INVITE_LINK = (
     f"https://discord.com/api/oauth2/authorize?client_id={BOT_CLIENT_ID}&permissions=8&scope=bot"
 )
