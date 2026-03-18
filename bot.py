@@ -26,7 +26,7 @@ async def load_extensions() -> None:
 async def on_ready() -> None:
     await bot.change_presence(activity=discord.Game("!help"))
     for guild in bot.guilds:
-        if guild.name == config.DISCORD_GUILD:
+        if config.DISCORD_GUILD is not None and guild.id == config.DISCORD_GUILD:
             break
 
 

@@ -12,7 +12,11 @@ def _get(key: str, default: str = "") -> str:
 
 # Discord
 DISCORD_TOKEN = _get("DISCORD_TOKEN")
-DISCORD_GUILD = _get("DISCORD_GUILD")
+_DISCORD_GUILD_RAW = _get("DISCORD_GUILD")
+try:
+    DISCORD_GUILD = int(_DISCORD_GUILD_RAW) if _DISCORD_GUILD_RAW else None
+except ValueError:
+    DISCORD_GUILD = None
 BANNED_USER_IDS = set(
     x.strip() for x in os.getenv("BANNED_USER_IDS", "").split(",") if x.strip()
 )
