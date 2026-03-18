@@ -51,8 +51,21 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_stock",
-            "description": "Get stock quote (price, change, high/low) for a ticker symbol or company name.",
-            "parameters": {"type": "object", "properties": {"symbol": {"type": "string", "description": "Ticker symbol or company name"}}, "required": ["symbol"]},
+            "description": "Get stock quote (price, change, high/low) for a ticker symbol or company name, optionally with performance over a time range.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "Ticker symbol or company name (e.g. AAPL, MSFT).",
+                    },
+                    "range": {
+                        "type": "string",
+                        "description": "Optional performance range such as '1m', '3m', '6m', '1y', or 'ytd' when the user asks about performance over time (e.g. 'this year', 'last 3 months').",
+                    },
+                },
+                "required": ["symbol"],
+            },
         },
     },
     {
@@ -60,7 +73,16 @@ TOOLS = [
         "function": {
             "name": "get_crypto",
             "description": "Get cryptocurrency price and market data. Use symbol like 'btc', 'eth'. Empty string returns top coins.",
-            "parameters": {"type": "object", "properties": {"name": {"type": "string", "description": "Crypto symbol (e.g. btc, eth) or empty for top list"}}, "required": ["name"]},
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Crypto symbol (e.g. btc, eth) or empty for top list",
+                    },
+                },
+                "required": ["name"],
+            },
         },
     },
     {
@@ -129,6 +151,7 @@ LAST_CRYPTO_BY_SESSION: dict[str, dict] = {}
 JARVIS_SYSTEM = (
     "You are Jarvis, a helpful, concise AI assistant running inside a Discord bot. "
     "You have access to tools: web_search, get_weather, get_stock, get_crypto, wikipedia_lookup, get_news, translate_text, get_invite_link. Use them when they would help answer the user; cite sources briefly when appropriate. "
+    "When the user asks about how a stock or crypto has performed over a period (e.g. 'this year', 'last 3 months'), call get_stock or get_crypto with an appropriate 'range' argument such as 'ytd', '1m', '3m', '6m', or '1y'. "
     "When the user asks for several different things (e.g. weather and news, or stock and crypto), call all relevant tools in the same turn so you can combine the information and list all sources. "
     "Always keep responses reasonably short and to the point, unless the user explicitly asks for more detail. "
     "Avoid tasks that would consume a very large number of tokens. If a user asks for something that would use an unusually large amount of tokens, politely decline and ask them to narrow or summarize their request instead."
@@ -154,17 +177,21 @@ async def _run_tool(name: str, arguments: dict) -> tuple[str, str]:
         if name == "get_stock":
             session_key = arguments.pop("_jarvis_session", None)
             data = await stocks_svc.get_stock_data(
-                arguments.get("symbol", ""), config.FINNHUB_API_KEY
+                arguments.get("symbol", ""), config.FINNHUB_API_KEY, arguments.get("range")
             )
             if session_key and "error" not in data:
                 LAST_STOCK_BY_SESSION[session_key] = data
             return stocks_svc.format_stock_as_text(data), "Finnhub"
         if name == "get_crypto":
             session_key = arguments.pop("_jarvis_session", None)
-            data = await crypto_svc.get_crypto_data(arguments.get("name"))
+            data = await crypto_svc.get_crypto_data(
+                arguments.get("name"),
+                None,
+                api_key=config.COINGECKO_API_KEY,
+            )
             if session_key and "error" not in data:
                 LAST_CRYPTO_BY_SESSION[session_key] = data
-            return crypto_svc.format_crypto_as_text(data), "Messari"
+            return crypto_svc.format_crypto_as_text(data), "CoinGecko"
         if name == "wikipedia_lookup":
             data = await asyncio.to_thread(
                 wikipedia_svc.wikipedia_lookup, arguments.get("topic", "")
@@ -419,7 +446,7 @@ class Jarvis(commands.Cog):
             if final_content:
                 # If the response used any rich-data API, only show the
                 # embeds and suppress the text reply to avoid redundancy.
-                if all(src not in used_sources for src in ("NewsAPI", "WeatherAPI", "Finnhub", "Messari")):
+                if all(src not in used_sources for src in ("NewsAPI", "WeatherAPI", "Finnhub", "CoinGecko")):
                     await self._send_jarvis_response(ctx, final_content, used_sources)
                     self._messages[server][sender].append({"role": "assistant", "content": final_content})
 
@@ -449,7 +476,7 @@ class Jarvis(commands.Cog):
                         await ctx.send(embed=embed)
                         LAST_STOCK_BY_SESSION.pop(session_key, None)
 
-                if "Messari" in used_sources:
+                if "CoinGecko" in used_sources:
                     session_key = f"{server}:{sender}"
                     data = LAST_CRYPTO_BY_SESSION.get(session_key)
                     if data:

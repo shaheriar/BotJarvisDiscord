@@ -1,4 +1,4 @@
-"""Crypto API service (Messari). Returns structured data for use by Jarvis tools and Discord embeds."""
+"""Crypto API service (CoinGecko). Returns structured data for use by Jarvis tools and Discord embeds."""
 import logging
 from typing import Any
 
@@ -7,40 +7,114 @@ import discord
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://data.messari.io/api/v1/assets"
+COINGECKO_BASE = "https://api.coingecko.com/api/v3"
+
+# Map common symbols to canonical CoinGecko coin id (avoids picking wrapped/duplicate tokens).
+CANONICAL_IDS: dict[str, str] = {
+    "btc": "bitcoin",
+    "eth": "ethereum",
+    "usdt": "tether",
+    "usdc": "usd-coin",
+    "bnb": "binancecoin",
+    "sol": "solana",
+    "xrp": "ripple",
+    "doge": "dogecoin",
+    "ada": "cardano",
+    "avax": "avalanche-2",
+    "link": "chainlink",
+    "dot": "polkadot",
+    "matic": "matic-network",
+    "shib": "shiba-inu",
+    "ltc": "litecoin",
+    "uni": "uniswap",
+    "atom": "cosmos",
+    "xlm": "stellar",
+}
 
 
-async def get_crypto_data(symbol: str | None) -> dict[str, Any]:
+async def get_crypto_data(symbol: str | None, range: str | None = None, api_key: str | None = None) -> dict[str, Any]:
     """
-    Fetch crypto data. If symbol is empty/None, returns top coins list.
+    Fetch crypto data using CoinGecko.
+
+    - If symbol is empty/None: returns top coins list by market cap (limited to 10).
+    - If symbol provided: returns current price and 24h change for that asset.
+
+    Note: CoinGecko's free API does not require an API key and this implementation
+    currently ignores the range parameter (only stocks support range performance).
+
     Returns structured dict on success, or {"error": "message"} on failure.
     """
-    symbol = (symbol or "").strip() if symbol is not None else ""
+    symbol = (symbol or "").strip().lower() if symbol is not None else ""
     try:
         timeout = aiohttp.ClientTimeout(total=10)
+        headers: dict[str, str] = {}
+        if api_key:
+            # CoinGecko demo/pro key header per docs
+            headers["x-cg-demo-api-key"] = api_key
+
+        # Top coins list
         if not symbol:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(BASE_URL, timeout=timeout) as r:
+            params = {
+                "vs_currency": "usd",
+                "order": "market_cap_desc",
+                "per_page": "10",
+                "page": "1",
+                "sparkline": "false",
+            }
+            async with aiohttp.ClientSession(headers=headers or None) as session:
+                async with session.get(f"{COINGECKO_BASE}/coins/markets", params=params, timeout=timeout) as r:
                     data = await r.json()
             coins = []
-            for x in data.get("data", [])[:10]:
+            for x in data or []:
                 coins.append({
-                    "name": x["name"],
-                    "symbol": x["symbol"],
-                    "price_usd": x["metrics"]["market_data"]["price_usd"],
+                    "name": x.get("name"),
+                    "symbol": x.get("symbol", "").upper(),
+                    "price_usd": x.get("current_price"),
                 })
+            if not coins:
+                return {"error": "No crypto data returned from CoinGecko."}
             return {"coins": coins}
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"{BASE_URL}/{symbol.lower()}/metrics", timeout=timeout) as r:
-                data = await r.json()
-        d = data["data"]
-        m = d["market_data"]
+
+        # Single asset: resolve symbol to CoinGecko id (prefer canonical to avoid wrong token)
+        matched_id = CANONICAL_IDS.get(symbol)
+        if not matched_id:
+            async with aiohttp.ClientSession(headers=headers or None) as session:
+                async with session.get(f"{COINGECKO_BASE}/coins/list", timeout=timeout) as r:
+                    listing = await r.json()
+            for coin in listing or []:
+                if coin.get("symbol", "").lower() == symbol:
+                    matched_id = coin.get("id")
+                    break
+            if not matched_id:
+                for coin in listing or []:
+                    if coin.get("id", "").lower() == symbol:
+                        matched_id = coin.get("id")
+                        break
+        if not matched_id:
+            return {"error": f"No crypto asset found for symbol: {symbol}"}
+
+        params = {
+            "localization": "false",
+            "tickers": "false",
+            "market_data": "true",
+            "community_data": "false",
+            "developer_data": "false",
+            "sparkline": "false",
+        }
+        async with aiohttp.ClientSession(headers=headers or None) as session:
+            async with session.get(f"{COINGECKO_BASE}/coins/{matched_id}", params=params, timeout=timeout) as r:
+                detail = await r.json()
+        market = (detail.get("market_data") or {})
+        current_price = (market.get("current_price") or {}).get("usd")
+        change_24h = market.get("price_change_24h_in_currency", {}).get("usd") or market.get("price_change_24h")
+        change_pct_24h = (market.get("price_change_percentage_24h_in_currency") or {}).get("usd") or market.get("price_change_percentage_24h")
+
         return {
-            "name": d["name"],
-            "symbol": d["symbol"],
-            "price_usd": m["price_usd"],
-            "ohlcv_1h": m.get("ohlcv_last_1_hour"),
-            "ohlcv_24h": m.get("ohlcv_last_24_hour"),
+            "name": detail.get("name"),
+            "symbol": detail.get("symbol", "").upper(),
+            "price_usd": current_price,
+            "change_24h": change_24h,
+            "change_pct_24h": change_pct_24h,
         }
     except aiohttp.ClientError as e:
         logger.exception("Crypto API request failed")
@@ -60,12 +134,12 @@ def format_crypto_as_text(data: dict[str, Any]) -> str:
             for c in data["coins"]
         ]
         return "\n".join(lines) if lines else "No crypto data."
-    m = data.get("ohlcv_24h") or {}
-    return (
-        f"{data['name']} ({data['symbol']}): ${round(data['price_usd'], 5)}. "
-        f"24h: O ${round(m.get('open', 0), 5)} H ${round(m.get('high', 0), 5)} "
-        f"L ${round(m.get('low', 0), 5)} C ${round(m.get('close', 0), 5)}."
-    )
+    base = f"{data['name']} ({data['symbol']}): ${round(data['price_usd'], 5)}."
+    if data.get("change_24h") is not None:
+        base += f" 24h change: ${round(data['change_24h'], 5)}"
+    if data.get("change_pct_24h") is not None:
+        base += f" ({round(data['change_pct_24h'], 2)}%)."
+    return base
 
 
 def build_crypto_embed(data: dict[str, Any]) -> discord.Embed:
@@ -90,17 +164,9 @@ def build_crypto_embed(data: dict[str, Any]) -> discord.Embed:
     price = data["price_usd"]
     embed = discord.Embed(title=f"Market data for {name} ({symbol})")
     embed.add_field(name="Price", value=f"${round(price, 5)}", inline=False)
-    o1 = data.get("ohlcv_1h") or {}
-    embed.add_field(name="Last 1 Hour", value="-----------------------------------------------", inline=False)
-    embed.add_field(name="Open", value=f"${round(o1.get('open', 0), 5)}", inline=True)
-    embed.add_field(name="High", value=f"${round(o1.get('high', 0), 5)}", inline=True)
-    embed.add_field(name="Low", value=f"${round(o1.get('low', 0), 5)}", inline=True)
-    embed.add_field(name="Close", value=f"${round(o1.get('close', 0), 5)}", inline=True)
-    o24 = data.get("ohlcv_24h") or {}
-    embed.add_field(name="Last 24 Hours", value="-----------------------------------------------", inline=False)
-    embed.add_field(name="Open", value=f"${round(o24.get('open', 0), 5)}", inline=True)
-    embed.add_field(name="High", value=f"${round(o24.get('high', 0), 5)}", inline=True)
-    embed.add_field(name="Low", value=f"${round(o24.get('low', 0), 5)}", inline=True)
-    embed.add_field(name="Close", value=f"${round(o24.get('close', 0), 5)}", inline=True)
+    if data.get("change_24h") is not None:
+        embed.add_field(name="24h Change", value=f"${round(data['change_24h'], 5)}", inline=True)
+    if data.get("change_pct_24h") is not None:
+        embed.add_field(name="24h Change %", value=f"{round(data['change_pct_24h'], 2)}%", inline=True)
     embed.set_footer(text=_dt.now().strftime("%m/%d/%Y, %H:%M:%S"))
     return embed

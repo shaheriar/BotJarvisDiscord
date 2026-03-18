@@ -35,6 +35,7 @@ Edit `.env` with your values:
 | `NEWS_API_KEY` | News headlines (Jarvis tool) | [newsapi.org](https://newsapi.org) — register, copy key from dashboard |
 | `OPENAI_API_KEY` | GPT for Jarvis | [platform.openai.com](https://platform.openai.com/api-keys) — create API key |
 | `DEEPL_API_KEY` | DeepL translation | [deepl.com](https://www.deepl.com/account/summary) — get a (free) API key |
+| `COINGECKO_API_KEY` | Optional CoinGecko demo/pro key | [docs.coingecko.com](https://docs.coingecko.com/) — create an API key (or leave blank to use public/free limits) |
 | `BANNED_USER_IDS` | Optional | Comma-separated Discord user IDs to block from Jarvis (e.g. `123,456`) |
 
 ### 3. Run the bot
