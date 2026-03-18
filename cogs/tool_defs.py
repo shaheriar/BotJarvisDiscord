@@ -93,14 +93,6 @@ TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "get_invite_link",
-            "description": "Get the bot invite link when the user asks how to add Jarvis to another server.",
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "translate_text",
             "description": "Translate text into another language using DeepL. Use when the user asks to translate or to respond in a different language.",
             "parameters": {
@@ -112,6 +104,20 @@ TOOLS = [
                     "formality": {"type": "string", "description": "Optional: 'default', 'more', or 'less' formality (where supported)."},
                 },
                 "required": ["text", "target_lang"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "music_play_youtube",
+            "description": "Play a YouTube song in the user's current voice channel. Use when the user asks to play a song/music in a voice channel.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "song_query": {"type": "string", "description": "Song name/artist or a YouTube URL to play."},
+                },
+                "required": ["song_query"],
             },
         },
     },
@@ -200,6 +206,7 @@ JARVIS_SYSTEM = (
     "  Range mapping: this year -> ytd; last year -> 1y; last 3 months -> 3m; last 6 months -> 6m; last month -> 1m; last week/unknown -> no range.\n"
     "- wikipedia_lookup: for a short Wikipedia summary (3-6 sentences).\n"
     "- translate_text: when the user asks to translate.\n"
+    "- Voice music playback: when the user asks to play a song/music in their voice channel, call `music_play_youtube` with `song_query`. After that, the bot joins the voice channel, plays YouTube audio, and shows an interactive embed with buttons (pause/stop/skip/leave) and queue behavior.\n"
     "\n"
     "Before responding, do an internal classification of the user's request:\n"
     "- If it is a normal request, answer it safely.\n"
@@ -297,8 +304,9 @@ async def _run_tool(name: str, arguments: dict) -> tuple[str, str]:
             )
             return translate_svc.format_translation_as_text(data), "DeepL"
 
-        if name == "get_invite_link":
-            return (f"Invite me to other servers using this link: {config.INVITE_LINK}", "Invite")
+        if name == "music_play_youtube":
+            # discord/voice execution happens in `cogs.jarvis` when the tool is called.
+            return "Music playback requested.", "YouTube"
 
     except Exception as e:
         logger.exception("Tool execution failed")

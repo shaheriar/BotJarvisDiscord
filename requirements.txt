@@ -5,3 +5,4 @@ discord.py[voice]==2.7.1
 openai>=1.30.0
 python-dotenv>=1.0.0
 wikipedia==1.4.0
+yt-dlp

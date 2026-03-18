@@ -12,6 +12,7 @@ from openai import AsyncOpenAI
 import config
 from cogs import tool_defs
 from cogs.news_fallback import news_search_fallback
+from cogs.music_player import play_youtube_song
 from services import crypto as crypto_svc
 from services import news as news_svc
 from services import stocks as stocks_svc
@@ -100,6 +101,8 @@ class Jarvis(commands.Cog):
                 "- summarize or explain a Wikipedia topic.\n"
                 "- translate this text to German (or any language).\n"
                 "- flip a coin, roll a dice, or answer like a magic 8-ball.\n"
+                "- ask me to play a song in your voice channel (e.g. `play pink floyd`).\n"
+                "- use the buttons on the music embed to pause/stop/skip/leave.\n"
                 "- chat about general questions, coding, or planning."
             )
             return None
@@ -254,7 +257,13 @@ class Jarvis(commands.Cog):
                 if name in ("get_news", "get_weather", "get_stock", "get_crypto"):
                     args["_jarvis_session"] = session_key
 
-                result_text, source_label = await tool_defs._run_tool(name, args)
+                if name == "music_play_youtube":
+                    # Discord/voice execution must happen with the real ctx.
+                    song_query = args.get("song_query", "") or ""
+                    result_text = await play_youtube_song(ctx, song_query)
+                    source_label = "YouTube"
+                else:
+                    result_text, source_label = await tool_defs._run_tool(name, args)
                 return tc.id, result_text, source_label
 
             try:
@@ -334,6 +343,11 @@ class Jarvis(commands.Cog):
         """Send either plain text or rich embeds, depending on tool usage."""
 
         if final_content:
+            # Music: `music_play_youtube` sends the embed itself. Suppress the
+            # model's trailing "Now playing..." style message so the embed
+            # is the only output.
+            if "YouTube" in used_sources:
+                return
             # Fallback: if the user clearly asked for news but the model didn't call get_news, fetch it so we can show the embed.
             if "NewsAPI" not in used_sources and config.NEWS_API_KEY:
                 q_lower = query.lower()
@@ -496,6 +510,13 @@ class Jarvis(commands.Cog):
                 forced_tool_choice = {"type": "function", "function": {"name": "get_news"}}
             elif wants_weather and not wants_news:
                 forced_tool_choice = {"type": "function", "function": {"name": "get_weather"}}
+            elif not wants_news and not wants_weather:
+                # If user asks to play music in voice, force the music tool.
+                wants_music = ("play" in q_lower) and any(
+                    k in q_lower for k in ("song", "music", "youtube", "track")
+                )
+                if wants_music:
+                    forced_tool_choice = {"type": "function", "function": {"name": "music_play_youtube"}}
 
             response_obj = await self._call_openai_with_retry(
                 ctx,
