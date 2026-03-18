@@ -155,6 +155,7 @@ LAST_CRYPTO_BY_SESSION: dict[str, dict] = {}
 JARVIS_SYSTEM = (
     "You are Jarvis, a helpful, concise AI assistant running inside a Discord bot. "
     "You have access to tools: web_search, get_weather, get_stock, get_crypto, wikipedia_lookup, get_news, translate_text, get_invite_link. Use them when they would help answer the user; cite sources briefly when appropriate. "
+    "When the user asks for news, headlines, or current events (e.g. 'news about the world', 'what's the news on tech'), you MUST call get_news with the topic or query—never answer from memory; the tool fetches current headlines and they are shown in a rich embed. "
     "When the user asks about how a stock or crypto has performed over a period (e.g. 'this year', 'last 3 months'), call get_stock or get_crypto with an appropriate 'range' argument such as 'ytd', '1m', '3m', '6m', or '1y'. "
     "When the user asks for several different things (e.g. weather and news, or stock and crypto), call all relevant tools in the same turn so you can combine the information and list all sources. "
     "Always keep responses reasonably short and to the point, unless the user explicitly asks for more detail. "
@@ -454,6 +455,22 @@ class Jarvis(commands.Cog):
 
             final_content = (assistant_msg.content or "").strip()
             if final_content:
+                # Fallback: if the user clearly asked for news but the model didn't call get_news, fetch it so we can show the embed.
+                session_key = f"{server}:{sender}"
+                if "NewsAPI" not in used_sources and config.NEWS_API_KEY:
+                    if any(kw in query_lower for kw in ("news", "headlines", "current events", "what's happening")):
+                        topic = ""
+                        if "news about" in query_lower:
+                            topic = query.split("about", 1)[-1].split("?")[0].strip()
+                        elif "news on" in query_lower:
+                            topic = query.split("on", 1)[-1].split("?")[0].strip()
+                        else:
+                            words = [w for w in query.replace("?", "").split() if w.lower() not in ("whats", "what", "the", "news", "headlines", "me", "give", "show")]
+                            topic = " ".join(words[:5]) if words else ""
+                        data = await news_svc.get_news_data(topic or None, config.NEWS_API_KEY)
+                        if "error" not in data:
+                            LAST_NEWS_BY_SESSION[session_key] = data
+                            used_sources.append("NewsAPI")
                 # If the response used any rich-data API, only show the
                 # embeds and suppress the text reply to avoid redundancy.
                 if all(src not in used_sources for src in ("NewsAPI", "WeatherAPI", "Finnhub", "CoinGecko")):
