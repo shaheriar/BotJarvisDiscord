@@ -1,10 +1,9 @@
+import os
 import requests
 import json
-import secretvars
 import discord
 
-ss = secretvars.secretvars()
-weatherkey = ss.weatherkey
+weatherkey = os.getenv("WEATHER_API_KEY")
 base_url = "https://api.weatherapi.com/v1/forecast.json?key="
 
 async def wthr(ctx):

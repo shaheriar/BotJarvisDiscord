@@ -1,11 +1,8 @@
 import requests
 import json
-import secretvars
 import discord
 from datetime import datetime
 
-ss = secretvars.secretvars()
-weatherkey = ss.weatherkey
 base_url = "https://data.messari.io/api/v1/assets"
 
 async def crypto(ctx):

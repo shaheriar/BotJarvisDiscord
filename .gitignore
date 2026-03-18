@@ -1,4 +1,5 @@
 Procfile
-secretvars.py
+.env
 env
 __pycache__
+.env

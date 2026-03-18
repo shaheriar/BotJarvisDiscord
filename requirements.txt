@@ -9,3 +9,6 @@ spacy==3.7.5
 translate==3.6.1
 wikipedia==1.4.0
 yt-dlp @ https://github.com/yt-dlp/yt-dlp/archive/master.tar.gz
+ddgs>=9.0.0
+openai>=1.30.0
+python-dotenv>=1.0.0

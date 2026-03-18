@@ -1,19 +1,15 @@
+import os
 import requests
 import json
-import secretvars
 import discord
 from datetime import datetime
 
-ss = secretvars.secretvars()
-weatherkey = ss.weatherkey
-
 async def stocks(ctx):
-    
     words = ctx.message.content
     try:
         query = words.split('!stocks ')[1]
         base_url = "https://finnhub.io/api/v1/"
-        token_url = "&token="+ss.stockskey
+        token_url = "&token=" + os.getenv("FINNHUB_API_KEY", "")
         search_url = base_url+'search?q='+query+token_url
         search = requests.get(search_url).json()['result'][0]
         info_url = base_url+'quote?symbol='+search['symbol']+token_url
