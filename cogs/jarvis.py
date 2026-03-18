@@ -50,7 +50,7 @@ class Jarvis(commands.Cog):
         )
         try:
             r = await self._client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=config.JARVIS_SUMMARY_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0,
                 max_tokens=400,
@@ -182,7 +182,7 @@ class Jarvis(commands.Cog):
         for attempt in range(max_retries + 1):
             try:
                 response_obj = await self._client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=config.JARVIS_MODEL,
                     messages=msg_list,
                     tools=tool_defs.TOOLS,
                     tool_choice=tool_choice,
@@ -302,7 +302,7 @@ class Jarvis(commands.Cog):
 
             try:
                 response_obj = await self._client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=config.JARVIS_MODEL,
                     messages=msg_list,
                     tools=tool_defs.TOOLS,
                     tool_choice="auto",
@@ -435,7 +435,7 @@ class Jarvis(commands.Cog):
             msg_list.append(assistant_msg)
             try:
                 response_obj = await self._client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=config.JARVIS_MODEL,
                     messages=msg_list,
                     temperature=config.JARVIS_RESPONSE_TEMPERATURE,
                     max_tokens=config.JARVIS_FINAL_RESPONSE_MAX_TOKENS,

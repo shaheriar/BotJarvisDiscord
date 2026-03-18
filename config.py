@@ -56,6 +56,8 @@ INVITE_LINK = (
 
 # Jarvis LLM tuning
 # These are env-overridable so you can tune quality/cost without redeploying code.
+JARVIS_MODEL = _get("JARVIS_MODEL", "gpt-4o-mini")
+JARVIS_SUMMARY_MODEL = _get("JARVIS_SUMMARY_MODEL", JARVIS_MODEL)
 JARVIS_TOOL_TEMPERATURE = _get_float("JARVIS_TOOL_TEMPERATURE", 0.1)
 JARVIS_RESPONSE_TEMPERATURE = _get_float("JARVIS_RESPONSE_TEMPERATURE", 0.5)
 JARVIS_TOOL_CALL_MAX_TOKENS = _get_int("JARVIS_TOOL_CALL_MAX_TOKENS", 256)
