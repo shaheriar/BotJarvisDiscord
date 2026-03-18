@@ -13,18 +13,16 @@ logger = logging.getLogger(__name__)
 
 intents = discord.Intents().all()
 bot = commands.Bot(command_prefix="!", intents=intents)
-bot.remove_command("help")
 
 
 async def load_extensions() -> None:
     await bot.load_extension("cogs.general")
-    await bot.load_extension("cogs.api_commands")
     await bot.load_extension("cogs.jarvis")
 
 
 @bot.event
 async def on_ready() -> None:
-    await bot.change_presence(activity=discord.Game("!help"))
+    await bot.change_presence(activity=discord.Game("@Jarvis"))
     for guild in bot.guilds:
         if config.DISCORD_GUILD is not None and guild.id == config.DISCORD_GUILD:
             break

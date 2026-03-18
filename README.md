@@ -34,6 +34,7 @@ Edit `.env` with your values:
 | `FINNHUB_API_KEY` | Stock data | [finnhub.io](https://finnhub.io) — register, copy key from dashboard |
 | `NEWS_API_KEY` | News headlines (Jarvis tool) | [newsapi.org](https://newsapi.org) — register, copy key from dashboard |
 | `OPENAI_API_KEY` | GPT for Jarvis | [platform.openai.com](https://platform.openai.com/api-keys) — create API key |
+| `DEEPL_API_KEY` | DeepL translation | [deepl.com](https://www.deepl.com/account/summary) — get a (free) API key |
 | `BANNED_USER_IDS` | Optional | Comma-separated Discord user IDs to block from Jarvis (e.g. `123,456`) |
 
 ### 3. Run the bot
@@ -48,25 +49,18 @@ python bot.py
 
 | Command | Description |
 |---------|-------------|
-| `!jarvis <question>` | Ask Jarvis anything. Uses GPT with web search, weather, stocks, crypto, news, and Wikipedia (define, summarize, search). |
-| `@Jarvis <question>` | Same as above by mentioning the bot. |
-| `!help` | List all commands. |
-| `!weather <city>` | Current weather and forecast. |
-| `!stocks <symbol or name>` | Stock quote (price, change, high/low). |
-| `!crypto [symbol]` | Crypto prices (e.g. `!crypto btc`); no argument = top coins. |
-| `!dice` | Roll a 6-sided die. |
-| `!coin` | Flip a coin. |
-| `!8ball <question>` | Magic 8-ball. |
+| `@Jarvis <question>` | Primary way to talk to Jarvis. Uses GPT with web search, weather (current & historical), stocks & crypto (current & range performance), news, and Wikipedia (define, summarize, search). |
+| `!jarvis <question>` | Legacy command (still works) but is deprecated in favor of `@Jarvis`. |
 | `!invite` | Bot invite link. |
 
 ---
 
 ## What Jarvis can do
 
-- **AI chat** — Ask questions via `!jarvis` or `@Jarvis`; responses use GPT-4o-mini with conversation memory and optional tools.
-- **Tools** — Jarvis can call web search (DuckDuckGo), weather (WeatherAPI), stocks (Finnhub), crypto (Messari), news (NewsAPI), and Wikipedia (define, summarize, search) when relevant.
+- **AI chat** — Ask questions via `@Jarvis` (or `!jarvis` as a legacy fallback); responses use GPT-4o-mini with conversation memory and optional tools.
+- **Tools** — Jarvis can call web search (DuckDuckGo), weather (WeatherAPI, including historical dates), stocks (Finnhub, including simple range performance), crypto (Messari, current market data), news (NewsAPI), Wikipedia (define, summarize, search), and DeepL for translation between languages when relevant.
 - **Reply context** — Reply to any message and use `!jarvis` or `@Jarvis` to ask about that message.
-- **Dedicated commands** — `!weather`, `!stocks`, and `!crypto` for quick lookups; news, define/summary/search are handled through Jarvis.
+- **Dedicated commands** — Minimal: `!invite`. Most functionality (search, weather, stocks, crypto, news, etc.) is accessed via `@Jarvis` (or `!jarvis` as a legacy fallback).
 - **Greetings** — Responds to “hey jarvis”, “thanks jarvis”, “jarvis tell me a joke”, etc.
 
 ---

@@ -14,6 +14,7 @@ from services import crypto as crypto_svc
 from services import news as news_svc
 from services import search as search_svc
 from services import stocks as stocks_svc
+from services import translate as translate_svc
 from services import weather as weather_svc
 from services import wikipedia as wikipedia_svc
 
@@ -32,8 +33,18 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_weather",
-            "description": "Get current weather and forecast for a city or location.",
-            "parameters": {"type": "object", "properties": {"city": {"type": "string", "description": "City or location name"}}, "required": ["city"]},
+            "description": "Get weather for a city or location. Supports current/forecast or historical when a date is given.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": "City or location name"},
+                    "date": {
+                        "type": "string",
+                        "description": "Optional date in YYYY-MM-DD for historical weather (e.g. 2026-03-12). If omitted, returns current/forecast.",
+                    },
+                },
+                "required": ["city"],
+            },
         },
     },
     {
@@ -68,11 +79,44 @@ TOOLS = [
             "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "Topic or search term (e.g. 'technology'); empty string for top headlines"}}, "required": ["query"]},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "translate_text",
+            "description": "Translate text into another language using DeepL. Use when the user asks to translate or to respond in a different language.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "The text to translate."},
+                    "target_lang": {
+                        "type": "string",
+                        "description": "Target language code (e.g. EN, DE, FR, ES, PT-BR, JA, ZH).",
+                    },
+                    "source_lang": {
+                        "type": "string",
+                        "description": "Optional source language code; if omitted DeepL will auto-detect.",
+                    },
+                    "formality": {
+                        "type": "string",
+                        "description": "Optional: 'default', 'more', or 'less' formality (where supported).",
+                    },
+                },
+                "required": ["text", "target_lang"],
+            },
+        },
+    },
 ]
+
+# Cache the last API results by a Jarvis "session" key so we can
+# render rich embeds after the language model responds.
+LAST_NEWS_BY_SESSION: dict[str, dict] = {}
+LAST_WEATHER_BY_SESSION: dict[str, dict] = {}
+LAST_STOCK_BY_SESSION: dict[str, dict] = {}
+LAST_CRYPTO_BY_SESSION: dict[str, dict] = {}
 
 JARVIS_SYSTEM = (
     "You are Jarvis, a helpful, concise AI assistant running inside a Discord bot. "
-    "You have access to tools: web_search, get_weather, get_stock, get_crypto, wikipedia_lookup, get_news. Use them when they would help answer the user; cite sources briefly when appropriate. "
+    "You have access to tools: web_search, get_weather, get_stock, get_crypto, wikipedia_lookup, get_news, translate_text. Use them when they would help answer the user; cite sources briefly when appropriate. "
     "When the user asks for several different things (e.g. weather and news, or stock and crypto), call all relevant tools in the same turn so you can combine the information and list all sources. "
     "Always keep responses reasonably short and to the point, unless the user explicitly asks for more detail. "
     "Avoid tasks that would consume a very large number of tokens. If a user asks for something that would use an unusually large amount of tokens, politely decline and ask them to narrow or summarize their request instead."
@@ -88,17 +132,26 @@ async def _run_tool(name: str, arguments: dict) -> tuple[str, str]:
             )
             return out, "DuckDuckGo"
         if name == "get_weather":
+            session_key = arguments.pop("_jarvis_session", None)
             data = await weather_svc.get_weather_data(
-                arguments.get("city", ""), config.WEATHER_API_KEY
+                arguments.get("city", ""), config.WEATHER_API_KEY, arguments.get("date")
             )
+            if session_key and "error" not in data:
+                LAST_WEATHER_BY_SESSION[session_key] = data
             return weather_svc.format_weather_as_text(data), "WeatherAPI"
         if name == "get_stock":
+            session_key = arguments.pop("_jarvis_session", None)
             data = await stocks_svc.get_stock_data(
                 arguments.get("symbol", ""), config.FINNHUB_API_KEY
             )
+            if session_key and "error" not in data:
+                LAST_STOCK_BY_SESSION[session_key] = data
             return stocks_svc.format_stock_as_text(data), "Finnhub"
         if name == "get_crypto":
+            session_key = arguments.pop("_jarvis_session", None)
             data = await crypto_svc.get_crypto_data(arguments.get("name"))
+            if session_key and "error" not in data:
+                LAST_CRYPTO_BY_SESSION[session_key] = data
             return crypto_svc.format_crypto_as_text(data), "Messari"
         if name == "wikipedia_lookup":
             data = await asyncio.to_thread(
@@ -106,10 +159,24 @@ async def _run_tool(name: str, arguments: dict) -> tuple[str, str]:
             )
             return wikipedia_svc.format_wikipedia_as_text(data), "Wikipedia"
         if name == "get_news":
+            session_key = arguments.pop("_jarvis_session", None)
             data = await news_svc.get_news_data(
                 arguments.get("query"), config.NEWS_API_KEY
             )
-            return news_svc.format_news_as_text(data), "NewsAPI"
+            if session_key and "error" not in data:
+                LAST_NEWS_BY_SESSION[session_key] = data
+            # Omit direct URLs in the text so Discord doesn't auto-embed
+            # each article; the rich paginated embeds handle links instead.
+            return news_svc.format_news_as_text(data, include_urls=False), "NewsAPI"
+        if name == "translate_text":
+            data = await translate_svc.translate_text(
+                text=arguments.get("text", ""),
+                target_lang=arguments.get("target_lang", ""),
+                api_key=config.DEEPL_API_KEY,
+                source_lang=arguments.get("source_lang"),
+                formality=arguments.get("formality"),
+            )
+            return translate_svc.format_translation_as_text(data), "DeepL"
     except Exception as e:
         logger.exception("Tool execution failed")
         return f"Tool error: {e}", name
@@ -181,7 +248,18 @@ class Jarvis(commands.Cog):
         elif self.bot.user and self.bot.user in ctx.message.mentions:
             query = raw_content.replace(f"<@{self.bot.user.id}>", "").replace(f"<@!{self.bot.user.id}>", "").strip()
         if not query:
-            await ctx.send("Please ask your question after `!jarvis` or by mentioning me (@Jarvis).")
+            await ctx.send(
+                "You can mention me as @Jarvis and ask things like:\n"
+                "- what can you do?\n"
+                "- what's the weather in New York (including past dates)?\n"
+                "- how has AAPL or BTC performed this year (or over the last 3 months)?\n"
+                "- show me today's news on technology or any topic.\n"
+                "- search the web for an answer.\n"
+                "- summarize or explain a Wikipedia topic.\n"
+                "- translate this text to German (or any language).\n"
+                "- flip a coin, roll a dice, or answer like a magic 8-ball.\n"
+                "- chat about general questions, coding, or planning."
+            )
             return
         server = str(ctx.message.guild)
 
@@ -286,6 +364,10 @@ class Jarvis(commands.Cog):
                         args = json.loads(tc.function.arguments or "{}")
                     except Exception:
                         args = {}
+                    # Attach a Jarvis session key so tools can store
+                    # structured results (e.g. news, weather, stocks, crypto) for this user.
+                    if name in ("get_news", "get_weather", "get_stock", "get_crypto"):
+                        args["_jarvis_session"] = f"{server}:{sender}"
                     result_text, source_label = await _run_tool(name, args)
                     return tc.id, result_text, source_label
 
@@ -320,8 +402,45 @@ class Jarvis(commands.Cog):
 
             final_content = (assistant_msg.content or "").strip()
             if final_content:
-                await self._send_jarvis_response(ctx, final_content, used_sources)
-                self._messages[server][sender].append({"role": "assistant", "content": final_content})
+                # If the response used any rich-data API, only show the
+                # embeds and suppress the text reply to avoid redundancy.
+                if all(src not in used_sources for src in ("NewsAPI", "WeatherAPI", "Finnhub", "Messari")):
+                    await self._send_jarvis_response(ctx, final_content, used_sources)
+                    self._messages[server][sender].append({"role": "assistant", "content": final_content})
+
+                if "NewsAPI" in used_sources:
+                    session_key = f"{server}:{sender}"
+                    data = LAST_NEWS_BY_SESSION.get(session_key)
+                    if data:
+                        pages = news_svc.build_news_embeds(data)
+                        if pages:
+                            view = news_svc.NewsPaginatorView(pages)
+                            await ctx.send(embed=pages[0], view=view)
+                        LAST_NEWS_BY_SESSION.pop(session_key, None)
+
+                if "WeatherAPI" in used_sources:
+                    session_key = f"{server}:{sender}"
+                    data = LAST_WEATHER_BY_SESSION.get(session_key)
+                    if data:
+                        embed = weather_svc.build_weather_embed(data)
+                        await ctx.send(embed=embed)
+                        LAST_WEATHER_BY_SESSION.pop(session_key, None)
+
+                if "Finnhub" in used_sources:
+                    session_key = f"{server}:{sender}"
+                    data = LAST_STOCK_BY_SESSION.get(session_key)
+                    if data:
+                        embed = stocks_svc.build_stock_embed(data)
+                        await ctx.send(embed=embed)
+                        LAST_STOCK_BY_SESSION.pop(session_key, None)
+
+                if "Messari" in used_sources:
+                    session_key = f"{server}:{sender}"
+                    data = LAST_CRYPTO_BY_SESSION.get(session_key)
+                    if data:
+                        embed = crypto_svc.build_crypto_embed(data)
+                        await ctx.send(embed=embed)
+                        LAST_CRYPTO_BY_SESSION.pop(session_key, None)
             else:
                 msg_list.append(assistant_msg)
                 try:

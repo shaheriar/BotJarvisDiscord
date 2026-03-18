@@ -3,6 +3,7 @@ import logging
 from typing import Any
 
 import aiohttp
+import discord
 
 logger = logging.getLogger(__name__)
 
@@ -65,3 +66,41 @@ def format_crypto_as_text(data: dict[str, Any]) -> str:
         f"24h: O ${round(m.get('open', 0), 5)} H ${round(m.get('high', 0), 5)} "
         f"L ${round(m.get('low', 0), 5)} C ${round(m.get('close', 0), 5)}."
     )
+
+
+def build_crypto_embed(data: dict[str, Any]) -> discord.Embed:
+    """Build Discord embed from crypto service dict."""
+    if "error" in data:
+        return discord.Embed(title="Error", description=data["error"], color=0xE74C3C)
+    from datetime import datetime as _dt
+
+    if "coins" in data:
+        embed = discord.Embed(title="Cryptocurrency Market Today")
+        for c in data["coins"]:
+            embed.add_field(
+                name=f"{c['name']} ({c['symbol']})",
+                value=f"${round(c['price_usd'], 5)}",
+                inline=True,
+            )
+        embed.set_footer(text=_dt.now().strftime("%m/%d/%Y, %H:%M:%S"))
+        return embed
+    # Single coin
+    name = data["name"]
+    symbol = data["symbol"]
+    price = data["price_usd"]
+    embed = discord.Embed(title=f"Market data for {name} ({symbol})")
+    embed.add_field(name="Price", value=f"${round(price, 5)}", inline=False)
+    o1 = data.get("ohlcv_1h") or {}
+    embed.add_field(name="Last 1 Hour", value="-----------------------------------------------", inline=False)
+    embed.add_field(name="Open", value=f"${round(o1.get('open', 0), 5)}", inline=True)
+    embed.add_field(name="High", value=f"${round(o1.get('high', 0), 5)}", inline=True)
+    embed.add_field(name="Low", value=f"${round(o1.get('low', 0), 5)}", inline=True)
+    embed.add_field(name="Close", value=f"${round(o1.get('close', 0), 5)}", inline=True)
+    o24 = data.get("ohlcv_24h") or {}
+    embed.add_field(name="Last 24 Hours", value="-----------------------------------------------", inline=False)
+    embed.add_field(name="Open", value=f"${round(o24.get('open', 0), 5)}", inline=True)
+    embed.add_field(name="High", value=f"${round(o24.get('high', 0), 5)}", inline=True)
+    embed.add_field(name="Low", value=f"${round(o24.get('low', 0), 5)}", inline=True)
+    embed.add_field(name="Close", value=f"${round(o24.get('close', 0), 5)}", inline=True)
+    embed.set_footer(text=_dt.now().strftime("%m/%d/%Y, %H:%M:%S"))
+    return embed
