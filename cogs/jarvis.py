@@ -458,11 +458,12 @@ class Jarvis(commands.Cog):
                 # Fallback: if the user clearly asked for news but the model didn't call get_news, fetch it so we can show the embed.
                 session_key = f"{server}:{sender}"
                 if "NewsAPI" not in used_sources and config.NEWS_API_KEY:
-                    if any(kw in query_lower for kw in ("news", "headlines", "current events", "what's happening")):
+                    q_lower = query.lower()
+                    if any(kw in q_lower for kw in ("news", "headlines", "current events", "what's happening")):
                         topic = ""
-                        if "news about" in query_lower:
+                        if "news about" in q_lower:
                             topic = query.split("about", 1)[-1].split("?")[0].strip()
-                        elif "news on" in query_lower:
+                        elif "news on" in q_lower:
                             topic = query.split("on", 1)[-1].split("?")[0].strip()
                         else:
                             words = [w for w in query.replace("?", "").split() if w.lower() not in ("whats", "what", "the", "news", "headlines", "me", "give", "show")]
