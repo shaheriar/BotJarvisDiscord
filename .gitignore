@@ -2,4 +2,3 @@ Procfile
 .env
 env
 __pycache__
-.env
