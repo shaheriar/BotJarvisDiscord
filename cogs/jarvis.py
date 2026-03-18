@@ -432,8 +432,8 @@ class Jarvis(commands.Cog):
         sender = str(ctx.message.author.id)
         if sender in config.BANNED_USER_IDS:
             await ctx.send(
-                "I'm unable to respond—your account has reached its usage limit. "
-                "Please try again later or contact support if you believe this is an error."
+                "You are prohibited from using this bot. "
+                "If you believe this is an error, hehe oopsie."
             )
             return
 
