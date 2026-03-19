@@ -27,6 +27,12 @@ logger = logging.getLogger(__name__)
 # Complete Discord markdown link: [label](url)
 _MD_LINK_FULL = re.compile(r"\[[^\]]*\]\([^)]*\)")
 
+# Jammed multi-quote lines: "... $249.94 Alphabet Inc. (GOOGL):" -> break before next "Name (TICKER):"
+_STOCK_OR_SYMBOL_BLOCK_SPLIT = re.compile(
+    r"(?<=[\d%$)\]\.])\s+"
+    r"(?=[A-Z][A-Za-z.&-]+(?: [A-Za-z.&-]+)*\s+\([A-Z]{2,5}\)\s*:)"
+)
+
 
 def _role_and_content_for_summary(m) -> tuple[str, str]:
     """Normalize OpenAI ChatCompletionMessage objects and dict messages for history summarization."""
@@ -149,18 +155,32 @@ class Jarvis(commands.Cog):
                 await ctx.send(part)
 
     def _compact_analysis(self, text: str, *, max_len: int = 1900) -> str:
-        """Normalize to paragraph form; cap length without breaking markdown links."""
+        """Normalize whitespace; keep blank-line paragraph breaks; cap length without breaking links."""
         raw = (text or "").strip()
         if not raw:
             return ""
-        lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
-        cleaned: list[str] = []
-        for ln in lines:
-            if ln.startswith(("-", "*", "•")):
-                ln = ln[1:].strip()
-            cleaned.append(ln)
-        paragraph = " ".join(cleaned)
-        return _truncate_preserving_markdown_links(paragraph, max_len)
+        # Preserve intentional breaks: double newlines / blank lines between topics.
+        blocks = re.split(r"\n\s*\n+", raw)
+        out_paragraphs: list[str] = []
+        for block in blocks:
+            block = block.strip()
+            if not block:
+                continue
+            lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
+            cleaned: list[str] = []
+            for ln in lines:
+                if ln.startswith(("-", "*", "•")):
+                    ln = ln[1:].strip()
+                cleaned.append(ln)
+            para = " ".join(cleaned)
+            if len(para) > 120:
+                chunks = _STOCK_OR_SYMBOL_BLOCK_SPLIT.split(para)
+                if len(chunks) > 1:
+                    out_paragraphs.extend(p.strip() for p in chunks if p.strip())
+                    continue
+            out_paragraphs.append(para)
+        merged = "\n\n".join(out_paragraphs)
+        return _truncate_preserving_markdown_links(merged, max_len)
 
     async def _prepare_query(self, ctx: commands.Context, query: str) -> str | None:
         """Normalize mentions/replies and validate length.
