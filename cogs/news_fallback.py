@@ -12,6 +12,7 @@ import re
 from datetime import datetime, timezone
 
 from services import search as search_svc
+from services.news import _blurb_preview, _effective_article_blurb
 
 from cogs.tool_defs import _sanitize_assistant_output
 
@@ -27,7 +28,7 @@ async def news_search_fallback(query: str) -> str | None:
     if not original_q:
         return None
 
-    # Extract a clean topic (e.g. "Saudi Arabia") from the question text.
+    # Extract a clean topic from the question text.
     q_lower = original_q.lower()
     if "user question:" in q_lower:
         q_lower = original_q.split("User question:", 1)[-1].strip().lower()
@@ -43,6 +44,13 @@ async def news_search_fallback(query: str) -> str | None:
     )
     topic = " ".join(topic.split())
     topic = topic[:80]
+
+    # Significant words from the topic for generic relevance scoring (not geo-specific).
+    _topic_tokens = [
+        t
+        for t in re.findall(r"[a-z0-9]+", topic.lower())
+        if len(t) >= 4
+    ][:12]
 
     current_year = str(datetime.now(timezone.utc).year)
 
@@ -88,11 +96,17 @@ async def news_search_fallback(query: str) -> str | None:
         # Penalize generic hub terms.
         if re.search(r"(?i)\b(headlines|breaking news|latest news)\b", block):
             score -= 2
-        # Prefer specificity: numbers and places.
+        # Prefer specificity: numbers.
         if re.search(r"\d", block):
             score += 1
-        if re.search(r"(?i)\b(saudi arabia|riyadh|jeddah|makkah|mecca|medina)\b", block):
-            score += 2
+        # Prefer overlap with the user's topic (whole-token match).
+        if _topic_tokens:
+            overlap = sum(
+                1
+                for t in _topic_tokens
+                if re.search(rf"(?i)(?<!\w){re.escape(t)}(?!\w)", block)
+            )
+            score += min(overlap * 2, 8)
         return score
 
     # Filter + dedupe by "title-ish" first line.
@@ -126,5 +140,62 @@ async def news_search_fallback(query: str) -> str | None:
 
     candidates.sort(key=lambda x: x[0], reverse=True)
     ranked_blocks = [b for _, b in candidates[:5]]
-    return "\n\n".join(ranked_blocks)
+
+    def parse_block(block: str) -> tuple[str, str, str]:
+        title_match = re.search(r"(?m)^\[\d+\]\s*(.+)$", block)
+        title = (title_match.group(1).strip() if title_match else "(No title)")
+        src_match = re.search(r"(?im)^Source:\s*(\S+)\s*$", block)
+        source_url = src_match.group(1).strip() if src_match else ""
+        body_lines: list[str] = []
+        for line in block.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if re.match(r"^\[\d+\]\s*", line):
+                continue
+            if re.match(r"(?i)^Source:\s*", line):
+                continue
+            body_lines.append(line)
+        body = " ".join(body_lines).strip()
+        return title, body, source_url
+
+    parsed = [parse_block(b) for b in ranked_blocks]
+
+    def _strip_recency_prefix(text: str) -> str:
+        return re.sub(
+            r"^\d+\s+(?:minutes?|hours?|days?|weeks?|months?)\s+ago\s*[-–·]\s*",
+            "",
+            text,
+            flags=re.I,
+        ).strip()
+
+    def _ensure_sentence(text: str) -> str:
+        t = (text or "").strip()
+        if not t:
+            return t
+        if t[0].isalpha() and t[0].islower():
+            t = t[0].upper() + t[1:]
+        if t[-1] not in ".!?":
+            t += "."
+        return t
+
+    parts: list[str] = []
+    for idx, (title, body, source_url) in enumerate(parsed, start=1):
+        body_clean = _strip_recency_prefix((body or "").strip())
+        title_clean = _strip_recency_prefix((title or "").strip())
+        primary = _effective_article_blurb(title_clean, body_clean or title_clean)
+        if not primary:
+            primary = title_clean or body_clean
+        snippet = _blurb_preview(primary, max_len=None)
+        if not snippet:
+            snippet = _blurb_preview(title_clean, max_len=None)
+        snippet = _ensure_sentence(snippet)
+        if source_url:
+            parts.append(f"{snippet} [[{idx}]]({source_url})")
+        else:
+            parts.append(f"{snippet} [[{idx}]]")
+
+    if not parts:
+        return ""
+    return "\n\n".join(parts).strip()
 

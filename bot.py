@@ -40,7 +40,12 @@ async def on_message(message: discord.Message) -> None:
 
 async def main() -> None:
     await load_extensions()
-    await bot.start(config.DISCORD_TOKEN)
+    try:
+        await bot.start(config.DISCORD_TOKEN)
+    finally:
+        from services import news as news_svc
+
+        await news_svc.close_news_http_session()
 
 
 if __name__ == "__main__":

@@ -2,7 +2,9 @@
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime, timezone
+from typing import Awaitable, Callable
 
 import discord
 import openai
@@ -13,12 +15,68 @@ import config
 from cogs import tool_defs
 from cogs.news_fallback import news_search_fallback
 from cogs.music_player import play_youtube_song
+from services.agent import AgentRunner
 from services import crypto as crypto_svc
+from services.memory import MemoryService
 from services import news as news_svc
 from services import stocks as stocks_svc
 from services import weather as weather_svc
 
 logger = logging.getLogger(__name__)
+
+# Complete Discord markdown link: [label](url)
+_MD_LINK_FULL = re.compile(r"\[[^\]]*\]\([^)]*\)")
+
+
+def _role_and_content_for_summary(m) -> tuple[str, str]:
+    """Normalize OpenAI ChatCompletionMessage objects and dict messages for history summarization."""
+
+    if isinstance(m, dict):
+        role = str(m.get("role", "unknown"))
+        content = m.get("content")
+        if content is None:
+            text = ""
+        elif isinstance(content, str):
+            text = content
+        else:
+            text = str(content)
+        return role, text
+
+    role = str(getattr(m, "role", None) or "unknown")
+    content = getattr(m, "content", None)
+    if isinstance(content, str):
+        return role, content
+    if content is not None:
+        return role, str(content)
+    if getattr(m, "tool_calls", None):
+        return role, "[assistant issued tool_calls]"
+    return role, ""
+
+
+def _truncate_preserving_markdown_links(text: str, max_len: int) -> str:
+    """Truncate without leaving a cut inside `[label](url)` (broken links look bad in Discord)."""
+    if len(text) <= max_len:
+        return text.rstrip()
+    cut = text[:max_len]
+    stripped_any = True
+    while stripped_any:
+        stripped_any = False
+        last_open = cut.rfind("[")
+        if last_open < 0:
+            break
+        tail = cut[last_open:]
+        if _MD_LINK_FULL.fullmatch(tail):
+            break
+        if "](" in tail:
+            after_lparen = tail.split("](", 1)[1]
+            if ")" in after_lparen:
+                break
+        # Incomplete link starting at last_open — drop it and retry
+        cut = cut[:last_open].rstrip()
+        stripped_any = True
+        if len(cut) < max(20, max_len // 4):
+            return text[:max_len].rstrip()
+    return cut.rstrip()
 
 
 class Jarvis(commands.Cog):
@@ -26,6 +84,7 @@ class Jarvis(commands.Cog):
         self.bot = bot
         self._client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
         self._messages: dict[str, dict[str, list]] = {}
+        self._memory = MemoryService(config.JARVIS_MEMORY_DB_PATH)
 
     async def _summarize_history(self, msgs: list) -> str:
         """Summarize conversation turns for context compression."""
@@ -34,9 +93,8 @@ class Jarvis(commands.Cog):
         to_summarize = msgs[1:-4]
         text_parts = []
         for m in to_summarize:
-            role = m.get("role", "unknown")
-            content = m.get("content") or ""
-            if isinstance(content, str):
+            role, content = _role_and_content_for_summary(m)
+            if content:
                 text_parts.append(f"{role}: {content[:500]}")
         if not text_parts:
             return ""
@@ -60,7 +118,12 @@ class Jarvis(commands.Cog):
             return ""
 
     async def _send_jarvis_response(
-        self, ctx: commands.Context, response: str, used_sources: list[str]
+        self,
+        ctx: commands.Context,
+        response: str,
+        used_sources: list[str],
+        *,
+        live_message: discord.Message | None = None,
     ) -> None:
         """Send response as plain message(s), splitting at 2000 chars if needed."""
         # Sources are intentionally suppressed (commented-out behavior) so we don't
@@ -73,9 +136,31 @@ class Jarvis(commands.Cog):
             body_parts = [""]
         # Disabled: suffix = ("\nSources: " + ", ".join(used_sources)) if used_sources else ""
         # Disabled: logic that appends/splits that suffix onto the message body.
-        for part in body_parts:
+        start_idx = 0
+        if live_message is not None and body_parts:
+            try:
+                await live_message.edit(content=body_parts[0])
+                start_idx = 1
+            except Exception:
+                start_idx = 0
+
+        for part in body_parts[start_idx:]:
             if part:
                 await ctx.send(part)
+
+    def _compact_analysis(self, text: str, *, max_len: int = 1900) -> str:
+        """Normalize to paragraph form; cap length without breaking markdown links."""
+        raw = (text or "").strip()
+        if not raw:
+            return ""
+        lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
+        cleaned: list[str] = []
+        for ln in lines:
+            if ln.startswith(("-", "*", "•")):
+                ln = ln[1:].strip()
+            cleaned.append(ln)
+        paragraph = " ".join(cleaned)
+        return _truncate_preserving_markdown_links(paragraph, max_len)
 
     async def _prepare_query(self, ctx: commands.Context, query: str) -> str | None:
         """Normalize mentions/replies and validate length.
@@ -139,29 +224,44 @@ class Jarvis(commands.Cog):
         system_message: dict,
         user_message: dict,
     ) -> list:
-        """Maintain per-(server,sender) conversation history and summarize when needed."""
-
+        """Maintain per-(server,sender) history using memory cache + SQLite persistence."""
+        await self._memory.init()
         if server not in self._messages:
             self._messages[server] = {}
 
-        if sender not in self._messages[server]:
-            self._messages[server][sender] = [system_message, user_message]
+        cached = self._messages[server].get(sender)
+        if cached is None:
+            stored = await self._memory.get_history(server=server, sender=sender, limit=30)
+            cached = [system_message, *stored]
+            self._messages[server][sender] = cached
         else:
-            if len(self._messages[server][sender]) > 30:
-                summary = await self._summarize_history(self._messages[server][sender])
-                if summary:
-                    last_four = self._messages[server][sender][-4:]
-                    self._messages[server][sender] = [
-                        system_message,
-                        {"role": "user", "content": f"[Conversation summary]\n{summary}"},
-                        {"role": "assistant", "content": "Understood. I'll continue from this summary."},
-                        *last_four,
-                    ]
-            self._messages[server][sender].append(user_message)
+            cached[0] = system_message
 
-        msg_list = self._messages[server][sender]
-        msg_list[0] = system_message
-        return msg_list
+        if len(cached) > 30:
+            summary = await self._summarize_history(cached)
+            if summary:
+                last_four = cached[-4:]
+                cached[:] = [
+                    system_message,
+                    {"role": "user", "content": f"[Conversation summary]\n{summary}"},
+                    {"role": "assistant", "content": "Understood. I'll continue from this summary."},
+                    *last_four,
+                ]
+                await self._memory.save_message(
+                    server=server,
+                    sender=sender,
+                    role="assistant",
+                    content=f"[Conversation summary]\n{summary}",
+                )
+
+        cached.append(user_message)
+        await self._memory.save_message(
+            server=server,
+            sender=sender,
+            role="user",
+            content=user_message.get("content", ""),
+        )
+        return cached
 
     async def _call_openai_with_retry(
         self,
@@ -206,6 +306,12 @@ class Jarvis(commands.Cog):
                         # Keep the same list object so callers see updates.
                         msg_list[:] = new_msg_list
                         self._messages[server][sender] = msg_list
+                        await self._memory.save_message(
+                            server=server,
+                            sender=sender,
+                            role="assistant",
+                            content=f"[Summary]\n{summary}",
+                        )
                         await asyncio.sleep(1)
                         continue
 
@@ -238,94 +344,44 @@ class Jarvis(commands.Cog):
         assistant_msg,
         tool_calls,
         session_key: str,
+        progress_callback: Callable[[str], Awaitable[None]] | None = None,
     ) -> tuple[object | None, list[str]]:
-        """Run all tool calls requested by the model and re-query until done."""
+        """Run tool calls via AgentRunner (bounded iterative loop)."""
 
-        used_sources: list[str] = []
+        async def exec_tool(name: str, args: dict) -> tuple[str, str]:
+            if name in ("get_news", "get_weather", "get_stock", "get_crypto"):
+                args["_jarvis_session"] = session_key
+            if name == "music_play_youtube":
+                song_query = args.get("song_query", "") or ""
+                result_text = await play_youtube_song(ctx, song_query)
+                return result_text, "YouTube"
+            return await tool_defs._run_tool(name, args)
 
-        while tool_calls:
-            msg_list.append(assistant_msg)
-
-            async def run_one(tc):
-                name = tc.function.name
-                try:
-                    args = json.loads(tc.function.arguments or "{}")
-                except Exception:
-                    args = {}
-
-                # Attach a Jarvis session key so tools can store structured results.
-                if name in ("get_news", "get_weather", "get_stock", "get_crypto"):
-                    args["_jarvis_session"] = session_key
-
-                if name == "music_play_youtube":
-                    # Discord/voice execution must happen with the real ctx.
-                    song_query = args.get("song_query", "") or ""
-                    result_text = await play_youtube_song(ctx, song_query)
-                    source_label = "YouTube"
-                else:
-                    result_text, source_label = await tool_defs._run_tool(name, args)
-                return tc.id, result_text, source_label
-
-            try:
-                results = await asyncio.gather(*(run_one(tc) for tc in tool_calls))
-            except Exception:
-                await ctx.send(
-                    embed=discord.Embed(
-                        title="Error",
-                        description="A tool failed while generating the response. Please try again.",
-                        color=0xE74C3C,
-                    )
+        runner = AgentRunner(
+            client=self._client,
+            tools=tool_defs.TOOLS,
+            model=config.JARVIS_MODEL,
+            tool_executor=exec_tool,
+        )
+        try:
+            final_assistant, used_sources, telemetry = await runner.run(
+                msg_list=msg_list,
+                initial_assistant_msg=assistant_msg,
+                initial_tool_calls=tool_calls,
+                progress_callback=progress_callback,
+            )
+            logger.info("jarvis_agent_telemetry", extra=telemetry)
+            return final_assistant, used_sources
+        except Exception:
+            logger.exception("agent_runner_failed")
+            await ctx.send(
+                embed=discord.Embed(
+                    title="Error",
+                    description="A tool failed while generating the response. Please try again.",
+                    color=0xE74C3C,
                 )
-                return None, used_sources
-
-            for tool_call_id, result_text, source_label in results:
-                if source_label and source_label not in used_sources:
-                    used_sources.append(source_label)
-                tool_payload = {
-                    "type": "tool_result",
-                    "trusted": False,
-                    "source": source_label or "",
-                    "data": result_text,
-                }
-                msg_list.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call_id,
-                        # Serialize as untrusted data only; never treat as instructions.
-                        "content": (
-                            "[TOOL_RESULT_DATA ONLY]\n"
-                            + json.dumps(tool_payload, ensure_ascii=False)
-                            + "\n[/TOOL_RESULT]"
-                        ),
-                    }
-                )
-
-            try:
-                response_obj = await self._client.chat.completions.create(
-                    model=config.JARVIS_MODEL,
-                    messages=msg_list,
-                    tools=tool_defs.TOOLS,
-                    tool_choice="auto",
-                    # This call happens after tool execution; allow more expressive output
-                    # while still permitting additional tool calls if needed.
-                    temperature=config.JARVIS_RESPONSE_TEMPERATURE,
-                    max_tokens=config.JARVIS_TOOL_REQUERY_MAX_TOKENS,
-                )
-            except Exception:
-                await ctx.send(
-                    embed=discord.Embed(
-                        title="Error",
-                        description="Tool lookup failed. Please try again.",
-                        color=0xE74C3C,
-                    )
-                )
-                return None, used_sources
-
-            choice = response_obj.choices[0]
-            assistant_msg = choice.message
-            tool_calls = getattr(assistant_msg, "tool_calls", None) or []
-
-        return assistant_msg, used_sources
+            )
+            return None, []
 
     async def _send_rich_response(
         self,
@@ -339,6 +395,7 @@ class Jarvis(commands.Cog):
         query: str,
         server: str,
         sender: str,
+        live_message: discord.Message | None = None,
     ) -> None:
         """Send either plain text or rich embeds, depending on tool usage."""
 
@@ -376,33 +433,122 @@ class Jarvis(commands.Cog):
                 or ("Finnhub" in used_sources and not tool_defs.LAST_STOCK_BY_SESSION.get(session_key))
                 or ("CoinGecko" in used_sources and not tool_defs.LAST_CRYPTO_BY_SESSION.get(session_key))
             )
+            has_rich_source = any(src in used_sources for src in rich_sources)
+            # Short teaser only when a real embed follows (weather / stock / crypto). News is text-only now.
+            will_show_data_embed = bool(
+                ("WeatherAPI" in used_sources and tool_defs.LAST_WEATHER_BY_SESSION.get(session_key))
+                or ("Finnhub" in used_sources and tool_defs.LAST_STOCK_BY_SESSION.get(session_key))
+                or ("CoinGecko" in used_sources and tool_defs.LAST_CRYPTO_BY_SESSION.get(session_key))
+            )
+            compact_limit = 650 if will_show_data_embed else 1900
+            final_content = self._compact_analysis(final_content, max_len=compact_limit)
 
-            # If the response used no rich-data tools, or the rich embed data is missing, send the model's text.
-            if all(src not in used_sources for src in rich_sources) or missing_any_embed:
-                await self._send_jarvis_response(ctx, final_content, used_sources)
-                self._messages[server][sender].append({"role": "assistant", "content": final_content})
+            # When NewsAPI failed, the model often says something like "there are no articles"
+            # after reading the error digest. Sending that first would edit `live_message`, then
+            # the fallback block would edit again — users see a wrong flash then the real answer.
+            news_snapshot = (
+                tool_defs.LAST_NEWS_BY_SESSION.get(session_key)
+                if "NewsAPI" in used_sources
+                else None
+            )
+            skip_initial_send_for_news_error = bool(
+                news_snapshot and "error" in news_snapshot
+            )
+
+            async def _persist_assistant_reply(text: str) -> None:
+                self._messages[server][sender].append({"role": "assistant", "content": text})
+                await self._memory.save_message(
+                    server=server,
+                    sender=sender,
+                    role="assistant",
+                    content=text,
+                )
+
+            sent_analysis = False
+            # Always send analysis text first (when available), then embeds.
+            # This gives users deeper insight before visual cards.
+            if not skip_initial_send_for_news_error:
+                if (has_rich_source and not missing_any_embed) or (not has_rich_source):
+                    await self._send_jarvis_response(
+                        ctx,
+                        final_content,
+                        used_sources,
+                        live_message=live_message,
+                    )
+                    sent_analysis = True
+                elif missing_any_embed:
+                    # If embed payload is missing, still provide the analysis text.
+                    await self._send_jarvis_response(
+                        ctx,
+                        final_content,
+                        used_sources,
+                        live_message=live_message,
+                    )
+                    sent_analysis = True
+
+            if sent_analysis:
+                await _persist_assistant_reply(final_content)
 
             if "NewsAPI" in used_sources:
                 data = tool_defs.LAST_NEWS_BY_SESSION.get(session_key)
                 if data:
                     if "error" in data:
-                        fallback_text = await news_search_fallback(query)
-                        if fallback_text is None:
-                            await ctx.send("I couldn't fetch the news right now. Please try again later.")
-                            return
-                        if not fallback_text:
+                        et = news_svc.news_error_type(data)
+                        if et == "invalid_key":
+                            invalid_msg = (
+                                "News isn't available: **NEWS_API_KEY** is missing or was rejected by NewsAPI. "
+                                "The bot owner needs to configure a valid key."
+                            )
                             await self._send_jarvis_response(
                                 ctx,
-                                "No recent news articles matched well. Try a narrower topic like 'oil prices today' or 'AI regulation updates'.",
+                                invalid_msg,
                                 used_sources=[],
+                                live_message=live_message,
                             )
+                            if skip_initial_send_for_news_error:
+                                await _persist_assistant_reply(invalid_msg)
+                            tool_defs.LAST_NEWS_BY_SESSION.pop(session_key, None)
                             return
-                        await self._send_jarvis_response(ctx, fallback_text, used_sources=[])
-                    else:
-                        pages = news_svc.build_news_embeds(data)
-                        if pages:
-                            view = news_svc.NewsPaginatorView(pages)
-                            await ctx.send(embed=pages[0], view=view)
+                        fallback_text = await news_search_fallback(query)
+                        if fallback_text is None:
+                            err_msg = (
+                                "I couldn't fetch the news right now"
+                                + (f" ({et})." if et else ".")
+                                + " Please try again later."
+                            )
+                            await self._send_jarvis_response(
+                                ctx,
+                                err_msg,
+                                used_sources=[],
+                                live_message=live_message,
+                            )
+                            if skip_initial_send_for_news_error:
+                                await _persist_assistant_reply(err_msg)
+                            tool_defs.LAST_NEWS_BY_SESSION.pop(session_key, None)
+                            return
+                        if not fallback_text:
+                            narrow_msg = (
+                                "No recent news articles matched well. Try a narrower topic like "
+                                "'oil prices today' or 'AI regulation updates'."
+                            )
+                            await self._send_jarvis_response(
+                                ctx,
+                                narrow_msg,
+                                used_sources=[],
+                                live_message=live_message,
+                            )
+                            if skip_initial_send_for_news_error:
+                                await _persist_assistant_reply(narrow_msg)
+                            tool_defs.LAST_NEWS_BY_SESSION.pop(session_key, None)
+                            return
+                        await self._send_jarvis_response(
+                            ctx,
+                            fallback_text,
+                            used_sources=[],
+                            live_message=live_message,
+                        )
+                        if skip_initial_send_for_news_error:
+                            await _persist_assistant_reply(fallback_text)
                     tool_defs.LAST_NEWS_BY_SESSION.pop(session_key, None)
 
             if "WeatherAPI" in used_sources:
@@ -455,7 +601,18 @@ class Jarvis(commands.Cog):
                 accumulated = tool_defs._sanitize_assistant_output(accumulated)
                 msg_list.append({"role": "assistant", "content": accumulated})
                 self._messages[server][sender] = msg_list
-                await self._send_jarvis_response(ctx, accumulated, used_sources)
+                await self._memory.save_message(
+                    server=server,
+                    sender=sender,
+                    role="assistant",
+                    content=accumulated,
+                )
+                await self._send_jarvis_response(
+                    ctx,
+                    accumulated,
+                    used_sources,
+                    live_message=live_message,
+                )
             else:
                 await ctx.send("I couldn't generate a response. Please try again.")
 
@@ -495,6 +652,14 @@ class Jarvis(commands.Cog):
             system_message=system_message,
             user_message=user_message,
         )
+
+        status_message = await ctx.send("Thinking...")
+
+        async def progress_update(text: str) -> None:
+            try:
+                await status_message.edit(content=text[:1800])
+            except Exception:
+                pass
 
         async with ctx.typing():
             # External gating: if the user intent is clearly "news" or "weather",
@@ -540,11 +705,39 @@ class Jarvis(commands.Cog):
                 assistant_msg=assistant_msg,
                 tool_calls=tool_calls,
                 session_key=session_key,
+                progress_callback=progress_update,
             )
             if assistant_msg is None:
                 return
 
             final_content = tool_defs._sanitize_assistant_output((assistant_msg.content or "").strip())
+            news_payload = tool_defs.LAST_NEWS_BY_SESSION.get(session_key)
+            if (
+                "NewsAPI" in used_sources
+                and news_payload
+                and "error" not in news_payload
+                and (news_payload.get("articles") or [])
+            ):
+                try:
+                    await progress_update("Reading the headlines and writing a summary...")
+                    syn = await news_svc.synthesize_news_bundle(
+                        self._client,
+                        articles=news_payload["articles"],
+                        user_query=query,
+                    )
+                    if syn:
+                        has_data_embed = any(
+                            s in used_sources for s in ("WeatherAPI", "Finnhub", "CoinGecko")
+                        )
+                        combined = (
+                            syn + "\n\n" + final_content
+                            if has_data_embed and final_content.strip()
+                            else syn
+                        )
+                        final_content = tool_defs._sanitize_assistant_output(combined.strip())
+                except Exception:
+                    logger.exception("news synthesis step failed; using model reply")
+
             await self._send_rich_response(
                 ctx,
                 msg_list=msg_list,
@@ -555,6 +748,7 @@ class Jarvis(commands.Cog):
                 query=query,
                 server=server,
                 sender=sender,
+                live_message=status_message,
             )
 
 

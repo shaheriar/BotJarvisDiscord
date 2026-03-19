@@ -29,6 +29,18 @@ def _get_int(key: str, default: int) -> int:
         return default
 
 
+def _get_bool(key: str, default: bool) -> bool:
+    raw = os.getenv(key)
+    if raw is None:
+        return default
+    value = raw.strip().lower()
+    if value in ("1", "true", "yes", "on"):
+        return True
+    if value in ("0", "false", "no", "off"):
+        return False
+    return default
+
+
 # Discord
 DISCORD_TOKEN = _get("DISCORD_TOKEN")
 _DISCORD_GUILD_RAW = _get("DISCORD_GUILD")
@@ -63,3 +75,19 @@ JARVIS_RESPONSE_TEMPERATURE = _get_float("JARVIS_RESPONSE_TEMPERATURE", 0.5)
 JARVIS_TOOL_CALL_MAX_TOKENS = _get_int("JARVIS_TOOL_CALL_MAX_TOKENS", 256)
 JARVIS_TOOL_REQUERY_MAX_TOKENS = _get_int("JARVIS_TOOL_REQUERY_MAX_TOKENS", 512)
 JARVIS_FINAL_RESPONSE_MAX_TOKENS = _get_int("JARVIS_FINAL_RESPONSE_MAX_TOKENS", 640)
+JARVIS_NEWS_SUMMARY_MODEL = _get("JARVIS_NEWS_SUMMARY_MODEL", JARVIS_MODEL)
+JARVIS_NEWS_SUMMARY_MAX_TOKENS = _get_int("JARVIS_NEWS_SUMMARY_MAX_TOKENS", 1000)
+JARVIS_NEWS_SUMMARY_TEMPERATURE = _get_float("JARVIS_NEWS_SUMMARY_TEMPERATURE", 0.22)
+JARVIS_NEWS_FETCH_PAGE_SIZE = _get_int("JARVIS_NEWS_FETCH_PAGE_SIZE", 20)
+JARVIS_MAX_AGENT_ITERATIONS = _get_int("JARVIS_MAX_AGENT_ITERATIONS", 5)
+JARVIS_MAX_RESEARCH_CHARS = _get_int("JARVIS_MAX_RESEARCH_CHARS", 4000)
+JARVIS_SELF_CRITIQUE = _get_bool("JARVIS_SELF_CRITIQUE", False)
+JARVIS_MEMORY_DB_PATH = _get("JARVIS_MEMORY_DB_PATH", "data/jarvis.db")
+
+# Web fetch/browser controls (Pi-friendly defaults)
+WEB_FETCH_MAX_CHARS = _get_int("WEB_FETCH_MAX_CHARS", 3000)
+WEB_FETCH_TIMEOUT = _get_int("WEB_FETCH_TIMEOUT", 10)
+WEB_FETCH_MAX_BYTES = _get_int("WEB_FETCH_MAX_BYTES", 2_000_000)
+WEB_FETCH_DENYLIST = _get("WEB_FETCH_DENYLIST", "")
+BROWSER_ENABLED = _get_bool("BROWSER_ENABLED", False)
+PLAYWRIGHT_HEADLESS = _get_bool("PLAYWRIGHT_HEADLESS", True)
