@@ -229,6 +229,21 @@ def _sanitize_assistant_output(text: str, *, remove_urls: bool = False) -> str:
     return text.strip()
 
 
+def discord_wrap_news_citation_links(text: str) -> str:
+    """
+    Discord unfurls `[label](https://...)` link previews. For synthesized news citations of the
+    form `[[n]](url)`, wrap the URL as `[[n]](<url>)` so the index stays a clickable inline link
+    without a rich embed under the message.
+    """
+    if not text:
+        return text
+    return re.sub(
+        r"(\[\[\d+\]\])\((https?://[^)\s<>]+)\)",
+        r"\1(<\2>)",
+        text,
+    )
+
+
 JARVIS_SYSTEM = (
     "You are Jarvis, a helpful, concise AI assistant running inside a Discord bot.\n"
     "\n"
@@ -243,7 +258,7 @@ JARVIS_SYSTEM = (
     "- web_search_deep: use for deeper research; it searches then fetches top pages.\n"
     "- web_fetch: fetch one specific URL for detailed content.\n"
     "- browser_visit: only for JS-heavy pages when fetch tools cannot extract enough content.\n"
-    "- get_news: when the user asks for news/headlines/current events. You MUST call get_news; never answer from memory. The tool returns raw article blocks; the bot will generate the user-facing summary. You may answer briefly or note that a summary is being prepared.\n"
+    "- get_news: when the user asks for news/headlines/current events. You MUST call get_news; never answer from memory. The tool returns raw article blocks; the bot synthesizes the ONLY user-visible news summary (with [[n]](url) citations). In your tool follow-up, do NOT paste article text, numbered lists of headlines, or [1/N]-style enumerations—keep it to one short sentence if needed.\n"
     "- get_weather: when the user asks for weather. Keep the message short; the bot will show an embed.\n"
     "- get_stock / get_crypto: when the user asks how something performed over time. Use range only when a time period is explicitly mentioned.\n"
     "  Range mapping: this year -> ytd; last year -> 1y; last 3 months -> 3m; last 6 months -> 6m; last month -> 1m; last week/unknown -> no range.\n"

@@ -27,13 +27,6 @@ logger = logging.getLogger(__name__)
 # Complete Discord markdown link: [label](url)
 _MD_LINK_FULL = re.compile(r"\[[^\]]*\]\([^)]*\)")
 
-# Jammed multi-quote lines: "... $249.94 Alphabet Inc. (GOOGL):" -> break before next "Name (TICKER):"
-_STOCK_OR_SYMBOL_BLOCK_SPLIT = re.compile(
-    r"(?<=[\d%$)\]\.])\s+"
-    r"(?=[A-Z][A-Za-z.&-]+(?: [A-Za-z.&-]+)*\s+\([A-Z]{2,5}\)\s*:)"
-)
-
-
 def _role_and_content_for_summary(m) -> tuple[str, str]:
     """Normalize OpenAI ChatCompletionMessage objects and dict messages for history summarization."""
 
@@ -130,6 +123,7 @@ class Jarvis(commands.Cog):
         used_sources: list[str],
         *,
         live_message: discord.Message | None = None,
+        suppress_news_link_previews: bool = False,
     ) -> None:
         """Send response as plain message(s), splitting at 2000 chars if needed."""
         # Sources are intentionally suppressed (commented-out behavior) so we don't
@@ -137,6 +131,8 @@ class Jarvis(commands.Cog):
         if not response.strip():
             return
         body = (response.strip() or "")
+        if suppress_news_link_previews:
+            body = tool_defs.discord_wrap_news_citation_links(body)
         body_parts = [body[i : i + 2000] for i in range(0, len(body), 2000)] if body else []
         if not body_parts:
             body_parts = [""]
@@ -144,43 +140,37 @@ class Jarvis(commands.Cog):
         # Disabled: logic that appends/splits that suffix onto the message body.
         start_idx = 0
         if live_message is not None and body_parts:
-            try:
-                await live_message.edit(content=body_parts[0])
-                start_idx = 1
-            except Exception:
-                start_idx = 0
+            edited_ok = False
+            if suppress_news_link_previews:
+                try:
+                    await live_message.edit(content=body_parts[0], suppress=True)
+                    edited_ok = True
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
+            if not edited_ok:
+                try:
+                    await live_message.edit(content=body_parts[0])
+                    edited_ok = True
+                except Exception:
+                    pass
+            start_idx = 1 if edited_ok else 0
 
+        send_kw: dict = {}
+        if suppress_news_link_previews:
+            send_kw["suppress_embeds"] = True
         for part in body_parts[start_idx:]:
             if part:
-                await ctx.send(part)
+                await ctx.send(part, **send_kw)
 
     def _compact_analysis(self, text: str, *, max_len: int = 1900) -> str:
-        """Normalize whitespace; keep blank-line paragraph breaks; cap length without breaking links."""
+        """Length-cap for Discord only. Do not reshape lists, bullets, or model-chosen line breaks."""
         raw = (text or "").strip()
         if not raw:
             return ""
-        # Preserve intentional breaks: double newlines / blank lines between topics.
-        blocks = re.split(r"\n\s*\n+", raw)
-        out_paragraphs: list[str] = []
-        for block in blocks:
-            block = block.strip()
-            if not block:
-                continue
-            lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
-            cleaned: list[str] = []
-            for ln in lines:
-                if ln.startswith(("-", "*", "•")):
-                    ln = ln[1:].strip()
-                cleaned.append(ln)
-            para = " ".join(cleaned)
-            if len(para) > 120:
-                chunks = _STOCK_OR_SYMBOL_BLOCK_SPLIT.split(para)
-                if len(chunks) > 1:
-                    out_paragraphs.extend(p.strip() for p in chunks if p.strip())
-                    continue
-            out_paragraphs.append(para)
-        merged = "\n\n".join(out_paragraphs)
-        return _truncate_preserving_markdown_links(merged, max_len)
+        raw = raw.replace("\r\n", "\n").replace("\r", "\n")
+        # Avoid absurd vertical gaps only; keep single newlines (bullets, formatting) intact.
+        raw = re.sub(r"\n{4,}", "\n\n\n", raw)
+        return _truncate_preserving_markdown_links(raw, max_len)
 
     async def _prepare_query(self, ctx: commands.Context, query: str) -> str | None:
         """Normalize mentions/replies and validate length.
@@ -494,6 +484,7 @@ class Jarvis(commands.Cog):
                         final_content,
                         used_sources,
                         live_message=live_message,
+                        suppress_news_link_previews=("NewsAPI" in used_sources),
                     )
                     sent_analysis = True
                 elif missing_any_embed:
@@ -503,6 +494,7 @@ class Jarvis(commands.Cog):
                         final_content,
                         used_sources,
                         live_message=live_message,
+                        suppress_news_link_previews=("NewsAPI" in used_sources),
                     )
                     sent_analysis = True
 
@@ -566,6 +558,7 @@ class Jarvis(commands.Cog):
                             fallback_text,
                             used_sources=[],
                             live_message=live_message,
+                            suppress_news_link_previews=True,
                         )
                         if skip_initial_send_for_news_error:
                             await _persist_assistant_reply(fallback_text)
@@ -632,6 +625,7 @@ class Jarvis(commands.Cog):
                     accumulated,
                     used_sources,
                     live_message=live_message,
+                    suppress_news_link_previews=("NewsAPI" in used_sources),
                 )
             else:
                 await ctx.send("I couldn't generate a response. Please try again.")
@@ -745,18 +739,28 @@ class Jarvis(commands.Cog):
                         articles=news_payload["articles"],
                         user_query=query,
                     )
-                    if syn:
-                        has_data_embed = any(
-                            s in used_sources for s in ("WeatherAPI", "Finnhub", "CoinGecko")
-                        )
+                    has_data_embed = any(
+                        s in used_sources for s in ("WeatherAPI", "Finnhub", "CoinGecko")
+                    )
+                    if syn and news_svc.is_news_summary_valid(syn):
                         combined = (
                             syn + "\n\n" + final_content
                             if has_data_embed and final_content.strip()
                             else syn
                         )
                         final_content = tool_defs._sanitize_assistant_output(combined.strip())
+                    else:
+                        # Never surface the tool follow-up as user-facing news (often raw titles / index dumps).
+                        final_content = (
+                            "I couldn't generate a reliable summary from the articles retrieved. "
+                            "Try a narrower topic (e.g. a specific country, company, or event), or ask again shortly."
+                        )
                 except Exception:
-                    logger.exception("news synthesis step failed; using model reply")
+                    logger.exception("news synthesis step failed")
+                    final_content = (
+                        "I couldn't generate a reliable summary from the articles retrieved. "
+                        "Try a narrower topic or ask again shortly."
+                    )
 
             await self._send_rich_response(
                 ctx,

@@ -60,10 +60,6 @@ def news_error_type(data: dict[str, Any]) -> str:
 def _news_err(err_type: str, message: str) -> dict[str, Any]:
     return {"error": {"type": err_type, "message": message}}
 
-_BOILERPLATE_HINT = re.compile(
-    r"(?i)\b(stay up to date|for all the latest|read more at|sign up for|subscribe to)\b",
-)
-
 
 def _looks_like_date_only(text: str) -> bool:
     """True when description is basically a calendar line (common bad NewsAPI snippet)."""
@@ -88,23 +84,92 @@ def _looks_like_date_only(text: str) -> bool:
     return len(re.findall(r"[A-Za-z]+", s)) <= 16
 
 
-def _looks_like_multi_headline_dump(text: str) -> bool:
-    """Aggregator / search snippet packing several unrelated headlines + 'ago' timestamps."""
-    if not text or len(text) < 140:
-        return False
-    t = text.lower()
-    ago_hits = t.count(" ago")
-    mid_dots = t.count("ago ·") + t.count("ago -")
-    return (ago_hits + mid_dots >= 2) or (ago_hits >= 2 and len(text) > 220)
-
-
-def _is_thin_or_boilerplate(text: str) -> bool:
-    s = re.sub(r"\s+", " ", (text or "").strip())
-    if len(s) < 32:
+def _is_boilerplate(text: str) -> bool:
+    """SEO / subscription filler that should never be summarized as substance."""
+    s = (text or "").strip().lower()
+    if not s:
         return True
-    if _BOILERPLATE_HINT.search(s) and len(s) < 160:
+    if re.search(
+        r"(stay (up to date|updated)|latest developments|follow .{0,48} news|"
+        r"sign up|subscribe|for all the latest|read more at|\bget the latest\b)",
+        s,
+    ):
         return True
     return False
+
+
+def _looks_like_multi_headline_dump(text: str) -> bool:
+    """Aggregator / snippet packing several unrelated headlines or timestamps."""
+    if not text:
+        return False
+    if len(text) < 100:
+        return False
+    t = text.lower()
+    if len(re.findall(r"\d{1,2}\s+(hours?|days?|minutes?)\s+ago", t)) >= 2:
+        return True
+    if "·" in text and text.count("·") >= 2:
+        return True
+    ago_hits = t.count(" ago")
+    mid_dots = t.count("ago ·") + t.count("ago -")
+    if (ago_hits + mid_dots >= 2) or (ago_hits >= 2 and len(text) > 220):
+        return True
+    caps = re.findall(r"[A-Z][^.!?\n]{25,}", text)
+    if len(caps) >= 3:
+        return True
+    if text.count(" | ") >= 2 or t.count(", and ") >= 2:
+        return True
+    return False
+
+
+_NEWS_QUERY_STOPWORDS = frozenset(
+    "a an the and or but in on at to for of as is are was were be been being "
+    "it its this that these those i you we they he she what which who whom "
+    "when where why how all any both each few more most other some such than "
+    "too very can could should would may might must shall will do did does doing "
+    "done get got give gave me my our your their news headlines headline latest "
+    "show tell ask give current events happening today todays breaking please "
+    "just only also not no yes about from into with without".split()
+)
+
+
+def _query_tokens(query: str) -> list[str]:
+    raw = (query or "").lower()
+    return [
+        t
+        for t in re.findall(r"[a-z0-9]+", raw, flags=re.I)
+        if len(t) > 2 and t not in _NEWS_QUERY_STOPWORDS
+    ]
+
+
+def _article_matches_query(article: dict[str, Any], query: str) -> bool:
+    """Drop obvious cross-topic junk when the user asked for a specific topic."""
+    tokens = _query_tokens(query)
+    if not tokens:
+        return True
+    text = f"{article.get('title', '')} {article.get('description', '')}".lower()
+    matches = sum(1 for tok in tokens if tok in text)
+    if len(tokens) == 1:
+        return matches >= 1
+    return matches >= 2
+
+
+def _is_valid_article(title: str, description: str) -> bool:
+    """Hard drop invalid rows before ranking or synthesis."""
+    title = (title or "").strip()
+    description = (description or "").strip()
+    combined = f"{title} {description}".strip()
+    if not combined:
+        return False
+    if _is_boilerplate(combined):
+        return False
+    if _looks_like_multi_headline_dump(description):
+        return False
+    if _looks_like_date_only(description) and _is_boilerplate(title.lower()):
+        return False
+    words = re.findall(r"\w+", combined)
+    if len(words) < 12:
+        return False
+    return True
 
 
 def _effective_article_blurb(title: str, description: str) -> str:
@@ -117,7 +182,7 @@ def _effective_article_blurb(title: str, description: str) -> str:
         return title
     if (
         _looks_like_date_only(description)
-        or _is_thin_or_boilerplate(description)
+        or _is_boilerplate(description)
         or _looks_like_multi_headline_dump(description)
     ):
         return title
@@ -148,7 +213,7 @@ def _score_article(title: str, description: str) -> float:
         score -= 2.0
     if _looks_like_multi_headline_dump(description):
         score -= 2.0
-    if _is_thin_or_boilerplate(description):
+    if _is_boilerplate(description):
         score -= 1.5
 
     word_count = len(re.findall(r"\w+", text))
@@ -196,6 +261,11 @@ def _truncate_clean(text: str, max_len: int) -> str:
 def _valid_news_summary(text: str) -> bool:
     """Lightweight check that inline Discord citations are present."""
     return "[[" in text and "]](" in text
+
+
+def is_news_summary_valid(text: str) -> bool:
+    """Public guard: synthesized user-facing news must include citation links."""
+    return _valid_news_summary((text or "").strip())
 
 
 async def get_news_data(query: str | None, api_key: str) -> dict[str, Any]:
@@ -257,7 +327,26 @@ async def get_news_data(query: str | None, api_key: str) -> dict[str, Any]:
                 "No news articles found for that topic.",
             )
 
-        picked = _dedupe_articles(raw_articles)
+        # Strict pipeline: valid rows → relevance → dedupe → rank → top 5
+        filtered = [
+            a
+            for a in raw_articles
+            if _is_valid_article(
+                (a.get("title") or "").strip(),
+                (a.get("description") or "").strip(),
+            )
+        ]
+        if q_param:
+            rel = [a for a in filtered if _article_matches_query(a, q_param)]
+            if rel:
+                filtered = rel
+        if not filtered:
+            return _news_err(
+                "no_results",
+                "No usable news articles matched that topic after filtering. Try a more specific query.",
+            )
+
+        picked = _dedupe_articles(filtered)
         picked.sort(
             key=lambda a: _score_article(
                 (a.get("title") or "").strip(),
@@ -348,6 +437,9 @@ async def synthesize_news_bundle(
 ) -> str:
     """One cohesive summary from all articles, with inline [[n]](url) citations."""
 
+    if not articles:
+        return ""
+
     blocks: list[str] = []
     for i, a in enumerate(articles, start=1):
         title = (a.get("title") or "").strip()
@@ -377,7 +469,8 @@ async def synthesize_news_bundle(
         "- Never reuse the same URL under a different index\n"
         "- Do NOT use bare numbers\n"
         "- Do NOT add a 'Sources' section\n"
-        "- Do NOT invent or modify URLs\n\n"
+        "- Do NOT invent or modify URLs\n"
+        "- Do NOT enumerate articles as [1/5] or paste raw titles/descriptions; write a real summary\n\n"
         "CONTENT RULES:\n"
         "- Synthesize across articles; do NOT summarize each article separately\n"
         "- Prioritize the most relevant and recent information\n"
