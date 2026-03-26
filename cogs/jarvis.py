@@ -359,7 +359,7 @@ class Jarvis(commands.Cog):
         """Run tool calls via AgentRunner (bounded iterative loop)."""
 
         async def exec_tool(name: str, args: dict) -> tuple[str, str]:
-            if name in ("get_news", "get_weather", "get_stock", "get_crypto"):
+            if name in ("get_news", "get_weather", "get_stock", "get_crypto", "get_stock_movers"):
                 args["_jarvis_session"] = session_key
             if name == "music_play_youtube":
                 song_query = args.get("song_query", "") or ""
@@ -444,6 +444,17 @@ class Jarvis(commands.Cog):
                 or ("CoinGecko" in used_sources and not tool_defs.LAST_CRYPTO_BY_SESSION.get(session_key))
             )
             has_rich_source = any(src in used_sources for src in rich_sources)
+
+            # If the model called get_stock_movers, it will be dispatched
+            # through the existing "Finnhub" embed path.
+            cached_stock_payload = tool_defs.LAST_STOCK_BY_SESSION.get(session_key) or {}
+            if (
+                "Finnhub" in used_sources
+                and isinstance(cached_stock_payload, dict)
+                and cached_stock_payload.get("kind") == "movers"
+            ):
+                final_content = "Here are the top US stock movers:"
+
             # Short teaser only when a real embed follows (weather / stock / crypto). News is text-only now.
             will_show_data_embed = bool(
                 ("WeatherAPI" in used_sources and tool_defs.LAST_WEATHER_BY_SESSION.get(session_key))
@@ -696,6 +707,26 @@ class Jarvis(commands.Cog):
                 )
                 if wants_music:
                     forced_tool_choice = {"type": "function", "function": {"name": "music_play_youtube"}}
+                # If user asks for top movers/gainers/losers, force the movers tool
+                # so we can render the rich embed with the full table.
+                if forced_tool_choice == "auto":
+                    wants_stock_movers = any(
+                        phrase in q_lower
+                        for phrase in (
+                            "top movers",
+                            "top mover",
+                            "top gainers",
+                            "top loser",
+                            "top losers",
+                            "gainers today",
+                            "losers today",
+                        )
+                    )
+                    if wants_stock_movers:
+                        forced_tool_choice = {
+                            "type": "function",
+                            "function": {"name": "get_stock_movers"},
+                        }
 
             response_obj = await self._call_openai_with_retry(
                 ctx,

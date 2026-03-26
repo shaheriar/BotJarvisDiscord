@@ -39,6 +39,9 @@ Edit `.env` with your values:
 | `DEEPL_API_KEY` | DeepL translation | [deepl.com](https://www.deepl.com/account/summary) — get a (free) API key |
 | `COINGECKO_API_KEY` | Optional CoinGecko demo/pro key | [docs.coingecko.com](https://docs.coingecko.com/) — create an API key (or leave blank to use public/free limits) |
 | `BANNED_USER_IDS` | Optional | Comma-separated Discord user IDs to block from Jarvis (e.g. `123,456`) |
+| `TOP_MOVERS_DAILY_TIME_UTC` | UTC time (HH:MM) to post daily Top Movers embeds | defaults to `09:00` |
+| `TOP_MOVERS_TOP_N` | number of gainers/losers to show | defaults to `5` |
+| `TOP_MOVERS_REGION` | market region for movers (currently only `US`) | defaults to `US` |
 
 ### 3. Run the bot
 
@@ -54,6 +57,8 @@ python bot.py
 |---------|-------------|
 | `@Jarvis <question>` | Primary way to talk to Jarvis. Uses GPT with web search, weather (current & historical), stocks & crypto (current & range performance), news, and Wikipedia (define, summarize, search). |
 | `@Jarvis <request>` (e.g. "play <song>") | Join your current voice channel and play YouTube audio (with interactive embed + queue). |
+| `!subscribe #channel` | Server-admin only: subscribe a channel to the daily Top Movers embed. |
+| `!unsubscribe #channel` | Server-admin only: remove the channel from the daily Top Movers list. |
 
 ---
 

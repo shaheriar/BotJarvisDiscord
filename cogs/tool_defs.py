@@ -64,6 +64,21 @@ _BASE_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "get_stock_movers",
+            "description": "Get top US stock movers (gainers and losers) in one consolidated result using Alpha Vantage.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "direction": {"type": "string", "description": "Which movers to return: 'gainers', 'losers', or 'both'. Default 'both'."},
+                    "top_n": {"type": "integer", "description": "How many symbols to return per side (gainers/losers). Default 5."},
+                    "region": {"type": "string", "description": "Market region. For now, only 'US' is supported."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_crypto",
             "description": "Get cryptocurrency price and market data. Use symbol like 'btc', 'eth'. Empty string returns top coins. Can also include a range for performance over time.",
             "parameters": {
@@ -166,6 +181,7 @@ TOOLS = _build_tools()
 LAST_NEWS_BY_SESSION: dict[str, dict] = {}
 LAST_WEATHER_BY_SESSION: dict[str, dict] = {}
 LAST_STOCK_BY_SESSION: dict[str, dict] = {}
+LAST_STOCK_MOVERS_BY_SESSION: dict[str, dict] = {}
 LAST_CRYPTO_BY_SESSION: dict[str, dict] = {}
 
 _URL_RE = re.compile(
@@ -262,6 +278,8 @@ JARVIS_SYSTEM = (
     "- get_weather: when the user asks for weather. Keep the message short; the bot will show an embed.\n"
     "- get_stock / get_crypto: when the user asks how something performed over time. Use range only when a time period is explicitly mentioned.\n"
     "  Range mapping: this year -> ytd; last year -> 1y; last 3 months -> 3m; last 6 months -> 6m; last month -> 1m; last week/unknown -> no range.\n"
+    "- get_stock_movers: when the user asks for 'top movers', 'top gainers', or 'top losers' in the stock market.\n"
+    "  Keep your user-facing message short; the bot will render a rich embed with the full table.\n"
     "- wikipedia_lookup: for a short Wikipedia summary (3-6 sentences).\n"
     "- translate_text: when the user asks to translate.\n"
     "- Voice music playback: when the user asks to play a song/music in their voice channel, call `music_play_youtube` with `song_query`. After that, the bot joins the voice channel, plays YouTube audio, and shows an interactive embed with buttons (pause/stop/skip/leave) and queue behavior.\n"
@@ -342,6 +360,23 @@ async def _run_tool(name: str, arguments: dict) -> tuple[str, str]:
             if session_key:
                 LAST_STOCK_BY_SESSION[session_key] = data
             return stocks_svc.format_stock_as_text(data), "Finnhub"
+
+        if name == "get_stock_movers":
+            session_key = arguments.pop("_jarvis_session", None)
+            data = await stocks_svc.get_stock_movers(
+                api_key=config.ALPHAVANTAGE_API_KEY,
+                direction=arguments.get("direction", "both"),
+                top_n=arguments.get("top_n", 5),
+                region=arguments.get("region", "US"),
+            )
+            if session_key:
+                LAST_STOCK_MOVERS_BY_SESSION[session_key] = data
+                # Reuse the existing "Finnhub" rich-embed dispatch path so we
+                # always render movers as an embed.
+                LAST_STOCK_BY_SESSION[session_key] = data
+            # Still return formatted text as a fallback, but the bot also
+            # caches the raw payload for rich embed rendering.
+            return stocks_svc.format_stock_movers_as_text(data), "Finnhub"
 
         if name == "get_crypto":
             session_key = arguments.pop("_jarvis_session", None)
