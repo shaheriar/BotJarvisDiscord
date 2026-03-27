@@ -655,7 +655,8 @@ class Jarvis(commands.Cog):
         if query is None:
             return
 
-        server = str(ctx.message.guild)
+        # Use stable guild ID for memory isolation across servers.
+        server = str(ctx.guild.id) if ctx.guild is not None else "dm"
 
         now_utc = datetime.now(timezone.utc)
         today = now_utc.strftime("%A, %B %d, %Y")
