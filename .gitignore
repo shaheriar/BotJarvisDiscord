@@ -3,3 +3,4 @@ Procfile
 env
 __pycache__
 data/jarvis.db
+*.txt

@@ -1,12 +1,15 @@
 import asyncio
 import logging
+import os
 import re
 from dataclasses import dataclass
 from typing import Any
 
+import config
 import discord
 from discord.ext import commands
 from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadError
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +37,7 @@ def _get_queue_lock(guild_id: int) -> asyncio.Lock:
 
 
 def _pick_best_audio_url(info: dict[str, Any]) -> str:
-    """Pick the best audio-only stream URL from a yt-dlp info dict."""
+    """Pick the best stream URL from a yt-dlp info dict (audio-first; muxed fallback)."""
 
     # When yt-dlp selects a format, the direct stream URL is often available as `url`.
     audio_url = info.get("url")
@@ -43,6 +46,7 @@ def _pick_best_audio_url(info: dict[str, Any]) -> str:
 
     formats = info.get("formats") or []
     audio_formats = []
+    muxed = []
     for f in formats:
         if not f:
             continue
@@ -51,41 +55,60 @@ def _pick_best_audio_url(info: dict[str, Any]) -> str:
         # yt-dlp uses 'none' for video codec when it is audio-only.
         if f.get("vcodec") == "none":
             audio_formats.append(f)
+        elif f.get("acodec") not in (None, "none"):
+            muxed.append(f)
 
-    if not audio_formats:
-        raise ValueError("No audio-only formats found")
+    if audio_formats:
+        pool = audio_formats
+    elif muxed:
+        pool = muxed
+    else:
+        raise ValueError("No formats with a direct URL found")
 
-    # Prefer higher bitrate/abr when available.
-    audio_formats.sort(key=lambda f: float(f.get("abr") or f.get("tbr") or 0), reverse=True)
-    best = audio_formats[0]
+    # Prefer higher audio bitrate when available.
+    pool.sort(key=lambda f: float(f.get("abr") or f.get("tbr") or 0), reverse=True)
+    best = pool[0]
     url = best.get("url")
     if not url:
-        raise ValueError("Best audio format had no URL")
+        raise ValueError("Selected format had no URL")
     return str(url)
 
 
-def _extract_youtube_audio(search_or_url: str) -> tuple[str, str, str | None]:
-    """Resolve a YouTube query (or URL) into (title, direct audio URL, thumbnail_url)."""
-    search_or_url = (search_or_url or "").strip()
-    if not search_or_url:
-        raise ValueError("Empty song query")
+def _youtube_cookie_path() -> str:
+    return (config.YOUTUBE_COOKIES_FILE or "").strip()
 
-    # Notes:
-    # - We intentionally request audio-only formats (bestaudio/best).
-    # - We resolve the best stream URL and let discord.py/FFmpeg handle decoding.
-    ydl_opts: dict[str, Any] = {
-        "format": "bestaudio/best",
+
+def _yt_dlp_opts(*, use_cookies: bool) -> dict[str, Any]:
+    """Build yt-dlp options. Cookies force web/TV clients that need JS for many videos; try without first."""
+    opts: dict[str, Any] = {
+        # Fallback chain: some paths expose only DASH audio, others a single muxed file.
+        "format": "bestaudio/best/worstaudio/worst/best",
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
         "ignoreerrors": False,
     }
+    if not use_cookies:
+        return opts
 
+    cookie_path = _youtube_cookie_path()
+    if cookie_path and os.path.isfile(cookie_path):
+        opts["cookiefile"] = cookie_path
+    elif cookie_path:
+        logger.warning(
+            "YOUTUBE_COOKIES_FILE is set (%s) but file not found; age-restricted YouTube may fail.",
+            cookie_path,
+        )
+    return opts
+
+
+def _extract_youtube_audio_once(search_or_url: str, *, use_cookies: bool) -> dict[str, Any]:
+    """Run yt-dlp and return the raw info dict for one video."""
+    ydl_opts = _yt_dlp_opts(use_cookies=use_cookies)
     with YoutubeDL(ydl_opts) as ydl:
         if _URL_RE.match(search_or_url):
             info = ydl.extract_info(search_or_url, download=False)
         else:
-            # First resolve the best matching video URL, then extract formats from that video.
             search_info = ydl.extract_info(f"ytsearch1:{search_or_url}", download=False)
             entries = (search_info or {}).get("entries") or []
             if not entries:
@@ -95,9 +118,32 @@ def _extract_youtube_audio(search_or_url: str) -> tuple[str, str, str | None]:
             if not target_url:
                 raise ValueError("Could not resolve search result to a video URL")
             info = ydl.extract_info(target_url, download=False)
-
     if not info:
         raise ValueError("yt-dlp returned no info")
+    return info
+
+
+def _extract_youtube_audio(search_or_url: str) -> tuple[str, str, str | None]:
+    """Resolve a YouTube query (or URL) into (title, direct audio URL, thumbnail_url)."""
+    search_or_url = (search_or_url or "").strip()
+    if not search_or_url:
+        raise ValueError("Empty song query")
+
+    cookie_path = _youtube_cookie_path()
+    cookies_ok = bool(cookie_path and os.path.isfile(cookie_path))
+
+    # Without cookies, yt-dlp can use android-style clients that work without a JS runtime.
+    # With cookies, it often uses web/TV clients that need EJS on the server — so public videos
+    # should be fetched anonymously first; cookies only for age-gated retries.
+    try:
+        info = _extract_youtube_audio_once(search_or_url, use_cookies=False)
+    except DownloadError as e:
+        msg = str(e).lower()
+        age_blocked = "sign in" in msg or "confirm your age" in msg
+        if age_blocked and cookies_ok:
+            info = _extract_youtube_audio_once(search_or_url, use_cookies=True)
+        else:
+            raise
 
     title = info.get("title") or search_or_url
     audio_url = _pick_best_audio_url(info)
@@ -566,6 +612,22 @@ async def play_youtube_song(ctx: commands.Context, song_query: str) -> str:
     try:
         async with ctx.typing():
             title, audio_url, thumbnail_url = await asyncio.to_thread(_extract_youtube_audio, song_query)
+    except DownloadError as e:
+        msg = str(e).lower()
+        if "sign in" in msg or "confirm your age" in msg:
+            await ctx.send(
+                "That video is age-restricted on YouTube. Set `YOUTUBE_COOKIES_FILE` in `.env` to a "
+                "cookies file from a logged-in browser (see yt-dlp: exporting YouTube cookies)."
+            )
+        elif "format is not available" in msg or "requested format" in msg:
+            await ctx.send(
+                "YouTube did not return a playable audio format. For age-restricted videos with cookies, "
+                "the server may need a JS runtime for yt-dlp (EJS wiki). Otherwise try updating yt-dlp."
+            )
+        else:
+            await ctx.send("I couldn't extract audio from that YouTube link.")
+        logger.exception("yt-dlp failed for YouTube audio")
+        return "Couldn't resolve song on YouTube."
     except Exception:
         await ctx.send("I couldn't find that on YouTube (or couldn't extract audio).")
         logger.exception("Failed to resolve YouTube audio")

@@ -93,6 +93,10 @@ WEB_FETCH_DENYLIST = _get("WEB_FETCH_DENYLIST", "")
 BROWSER_ENABLED = _get_bool("BROWSER_ENABLED", False)
 PLAYWRIGHT_HEADLESS = _get_bool("PLAYWRIGHT_HEADLESS", True)
 
+# YouTube / music (yt-dlp): cookies for age-restricted videos only. The music cog resolves
+# public videos without cookies first (avoids cookie+web-client paths that need JS on the Pi).
+YOUTUBE_COOKIES_FILE = _get("YOUTUBE_COOKIES_FILE")
+
 # Daily Top Movers scheduler
 TOP_MOVERS_DAILY_TIME_UTC = _get("TOP_MOVERS_DAILY_TIME_UTC", "09:00")  # HH:MM in UTC
 TOP_MOVERS_TOP_N = _get_int("TOP_MOVERS_TOP_N", 5)
