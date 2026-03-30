@@ -51,7 +51,8 @@ async def _run_top_movers_daily_scheduler() -> None:
     while not bot.is_closed():
         try:
             now = datetime.now(timezone.utc)
-            if now.time() >= target_t:
+            # Weekdays only: US equity market is closed Sat–Sun (UTC; same basis as TOP_MOVERS_DAILY_TIME_UTC).
+            if now.time() >= target_t and now.weekday() < 5:
                 today = now.date().isoformat()
                 due = await top_movers_subs.get_due_subscriptions(today_utc_date=today)
                 if due:
