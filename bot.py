@@ -162,8 +162,9 @@ async def on_ready() -> None:
     await bot.change_presence(activity=discord.Game("@Jarvis"))
 
     # Start scheduler once.
-    if not getattr(bot, "_top_movers_scheduler_task", None):
-        bot._top_movers_scheduler_task = asyncio.create_task(_run_top_movers_daily_scheduler())
+    # TODO: Uncomment this when we have S&P 500 data
+    # if not getattr(bot, "_top_movers_scheduler_task", None):
+    #     bot._top_movers_scheduler_task = asyncio.create_task(_run_top_movers_daily_scheduler())
 
 
 @bot.event
